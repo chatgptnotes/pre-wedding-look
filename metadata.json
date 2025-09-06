@@ -1,0 +1,7 @@
+{
+  "name": "Pre-wedding Look",
+  "description": "Generate beautiful, Indian-style pre-wedding photoshoot images by selecting locations, attire, and poses. Create your dream pre-wedding look with AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
