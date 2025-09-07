@@ -16,6 +16,8 @@ import type {
 export class GalleryService {
   // Check if Supabase is available
   private static checkSupabase() {
+    const isAvailable = !!supabase;
+    console.log('Debug: checkSupabase() ->', isAvailable, 'supabase:', supabase);
     if (!supabase) {
       console.warn('Supabase not configured. Using demo mode.');
       return false;
@@ -26,9 +28,11 @@ export class GalleryService {
   // ==================== Countries ====================
   
   static async getCountries(activeOnly = true): Promise<Country[]> {
+    console.log('Debug: getCountries() called with activeOnly:', activeOnly);
+    
     if (!this.checkSupabase()) {
       // Return demo countries when Supabase isn't available
-      return [
+      const demoCountries = [
         {
           id: '1',
           iso_code: 'IN',
@@ -60,6 +64,9 @@ export class GalleryService {
           updated_at: new Date().toISOString()
         }
       ];
+      
+      console.log('Debug: Returning demo countries:', demoCountries);
+      return demoCountries;
     }
 
     let query = supabase.from('countries').select('*');
@@ -622,18 +629,29 @@ export class GalleryService {
   // ==================== Combined Operations ====================
   
   static async getCountriesWithModels(): Promise<CountryWithModels[]> {
-    const countries = await this.getCountries();
+    console.log('Debug: getCountriesWithModels() called');
     
-    if (!this.checkSupabase()) {
-      // Return demo data when Supabase isn't available
-      return countries.map(country => ({
-        ...country,
-        models: {
-          bride: null,
-          groom: null
-        },
-        imageCount: 0
-      }));
+    try {
+      const countries = await this.getCountries();
+      console.log('Debug: Got countries from getCountries():', countries);
+      
+      if (!this.checkSupabase()) {
+        // Return demo data when Supabase isn't available
+        const countriesWithModels = countries.map(country => ({
+          ...country,
+          models: {
+            bride: null,
+            groom: null
+          },
+          imageCount: 0
+        }));
+        
+        console.log('Debug: Returning demo countries with models:', countriesWithModels);
+        return countriesWithModels;
+      }
+    } catch (error) {
+      console.error('Debug: Error in getCountriesWithModels():', error);
+      throw error;
     }
 
     const countriesWithModels = await Promise.all(

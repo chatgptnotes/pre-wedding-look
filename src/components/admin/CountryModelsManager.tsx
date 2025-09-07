@@ -17,7 +17,9 @@ const CountryModelsManager: React.FC = () => {
   const loadCountriesWithModels = async () => {
     try {
       setLoading(true);
+      console.log('Debug: Loading countries with models...');
       const data = await GalleryService.getCountriesWithModels();
+      console.log('Debug: Loaded countries:', data);
       setCountries(data);
     } catch (error) {
       console.error('Error loading countries:', error);
@@ -51,20 +53,30 @@ const CountryModelsManager: React.FC = () => {
       setErrorMessage('');
       setSuccessMessage('');
 
+      console.log('Debug: Starting upload for', countryIso, role);
+      console.log('Debug: Countries array:', countries);
+
       // Get country
       const country = countries.find(c => c.iso_code === countryIso);
       if (!country) {
-        throw new Error('Country not found');
+        console.error('Debug: Country not found. Available countries:', countries.map(c => c.iso_code));
+        throw new Error(`Country not found: ${countryIso}. Available: ${countries.map(c => c.iso_code).join(', ')}`);
       }
 
+      console.log('Debug: Found country:', country);
+
       // Upload image to storage
+      console.log('Debug: Uploading image to storage...');
       const { url, path, sha256 } = await GalleryService.uploadModelImage(
         file,
         countryIso,
         role
       );
 
+      console.log('Debug: Image uploaded successfully:', { url, path, sha256 });
+
       // Create or update model in database
+      console.log('Debug: Creating/updating model in database...');
       await GalleryService.createOrUpdateModel(
         country.id,
         role,
@@ -78,13 +90,14 @@ const CountryModelsManager: React.FC = () => {
         }
       );
 
+      console.log('Debug: Model created/updated successfully');
       setSuccessMessage(`Successfully uploaded ${role} model for ${country.name}`);
       
       // Reload countries to show new model
       await loadCountriesWithModels();
     } catch (error) {
       console.error('Error uploading model:', error);
-      setErrorMessage(`Failed to upload ${role} model`);
+      setErrorMessage(`Failed to upload ${role} model: ${error.message || 'Unknown error'}`);
     } finally {
       setUploadingRole(null);
     }

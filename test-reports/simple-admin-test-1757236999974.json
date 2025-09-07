@@ -1,0 +1,478 @@
+{
+  "timestamp": "2025-09-07T09:23:19.974Z",
+  "duration": "0s",
+  "summary": {
+    "total": 48,
+    "passed": 38,
+    "failed": 0,
+    "warnings": 9,
+    "info": 1
+  },
+  "categories": {
+    "Access": {
+      "passed": 2,
+      "failed": 0,
+      "warned": 4,
+      "info": 0
+    },
+    "Source Code": {
+      "passed": 3,
+      "failed": 0,
+      "warned": 0,
+      "info": 0
+    },
+    "Admin Page": {
+      "passed": 5,
+      "failed": 0,
+      "warned": 0,
+      "info": 0
+    },
+    "Country Models": {
+      "passed": 8,
+      "failed": 0,
+      "warned": 0,
+      "info": 0
+    },
+    "Style Application": {
+      "passed": 9,
+      "failed": 0,
+      "warned": 0,
+      "info": 0
+    },
+    "Gallery Service": {
+      "passed": 10,
+      "failed": 0,
+      "warned": 0,
+      "info": 0
+    },
+    "Batch Failure Investigation": {
+      "passed": 0,
+      "failed": 0,
+      "warned": 1,
+      "info": 1
+    },
+    "Responsive Design": {
+      "passed": 0,
+      "failed": 0,
+      "warned": 2,
+      "info": 0
+    },
+    "Error Handling": {
+      "passed": 1,
+      "failed": 0,
+      "warned": 2,
+      "info": 0
+    }
+  },
+  "results": [
+    {
+      "category": "Access",
+      "test": "App Loading",
+      "status": "PASS",
+      "message": "App accessible at http://localhost:5174 (200)",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.970Z"
+    },
+    {
+      "category": "Access",
+      "test": "Admin References",
+      "status": "WARN",
+      "message": "No explicit admin references found in HTML",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.970Z"
+    },
+    {
+      "category": "Access",
+      "test": "React App",
+      "status": "WARN",
+      "message": "React App not detected in initial HTML",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.970Z"
+    },
+    {
+      "category": "Access",
+      "test": "Vite",
+      "status": "PASS",
+      "message": "Vite detected",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.970Z"
+    },
+    {
+      "category": "Access",
+      "test": "Admin Functionality",
+      "status": "WARN",
+      "message": "Admin Functionality not detected in initial HTML",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.971Z"
+    },
+    {
+      "category": "Access",
+      "test": "Gallery Features",
+      "status": "WARN",
+      "message": "Gallery Features not detected in initial HTML",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.971Z"
+    },
+    {
+      "category": "Source Code",
+      "test": "AdminPage.tsx Exists",
+      "status": "PASS",
+      "message": "File exists with 42987 characters",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.971Z"
+    },
+    {
+      "category": "Admin Page",
+      "test": "Country Models Manager Section",
+      "status": "PASS",
+      "message": "Section implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Admin Page",
+      "test": "Style Application Section",
+      "status": "PASS",
+      "message": "Section implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Admin Page",
+      "test": "Navigation System",
+      "status": "PASS",
+      "message": "Section implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Admin Page",
+      "test": "Role-Based Access",
+      "status": "PASS",
+      "message": "Section implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Admin Page",
+      "test": "Tab Navigation",
+      "status": "PASS",
+      "message": "Section implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Source Code",
+      "test": "CountryModelsManager.tsx Exists",
+      "status": "PASS",
+      "message": "File exists with 10176 characters",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "Country Selection Dropdown",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "File Upload Areas",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "Drag and Drop",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "File Validation",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "Bride/Groom Models",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "Error Handling",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "Success Messages",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Country Models",
+      "test": "Role-Country Constraint",
+      "status": "PASS",
+      "message": "Role and country handling detected",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Source Code",
+      "test": "StyleApplicationPanel.tsx Exists",
+      "status": "PASS",
+      "message": "File exists with 12868 characters",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.972Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Country Selection",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Role Selection",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Style Type Filtering",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Individual Apply Buttons",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Batch Generation",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Queue Status",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Error Handling",
+      "status": "PASS",
+      "message": "Feature implementation found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Generate All Button",
+      "status": "PASS",
+      "message": "Generate All button found in code",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Style Application",
+      "test": "Batch Logic Implementation",
+      "status": "PASS",
+      "message": "Batch application logic implemented",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Demo Mode Handling",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Country Operations",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Model Management",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Style Operations",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Queue Management",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Error Handling",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "File Upload",
+      "status": "PASS",
+      "message": "Feature implementation found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Batch Queue Implementation",
+      "status": "PASS",
+      "message": "Batch queue method exists",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Model Validation",
+      "status": "PASS",
+      "message": "Model validation checks implemented",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Gallery Service",
+      "test": "Demo Mode Support",
+      "status": "PASS",
+      "message": "Demo mode properly implemented",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Batch Failure Investigation",
+      "test": "Potential Issues Found",
+      "status": "WARN",
+      "message": "Found 4 potential issues: Batch method lacks comprehensive error handling; Batch method may not handle demo mode properly; Batch apply handler lacks error handling; Batch apply handler may not show error messages to user",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Batch Failure Investigation",
+      "test": "Recommendations",
+      "status": "INFO",
+      "message": "Recommended fixes: Ensure models are uploaded for the selected country/role before batch operations; Verify demo mode is properly configured when Supabase is not available; Add explicit error messages for failed batch operations; Implement loading states during batch processing; Check network connectivity and service availability",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.973Z"
+    },
+    {
+      "category": "Responsive Design",
+      "test": "Admin Page",
+      "status": "WARN",
+      "message": "2/4 responsive features detected",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.974Z"
+    },
+    {
+      "category": "Responsive Design",
+      "test": "Style Application Panel",
+      "status": "WARN",
+      "message": "2/4 responsive features detected",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.974Z"
+    },
+    {
+      "category": "Error Handling",
+      "test": "galleryService.ts",
+      "status": "WARN",
+      "message": "3/5 error handling patterns found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.974Z"
+    },
+    {
+      "category": "Error Handling",
+      "test": "StyleApplicationPanel.tsx",
+      "status": "WARN",
+      "message": "2/5 error handling patterns found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.974Z"
+    },
+    {
+      "category": "Error Handling",
+      "test": "CountryModelsManager.tsx",
+      "status": "PASS",
+      "message": "4/5 error handling patterns found",
+      "details": {},
+      "timestamp": "2025-09-07T09:23:19.974Z"
+    }
+  ],
+  "keyFindings": [
+    {
+      "issue": "Batch Generation Issues Detected",
+      "severity": "HIGH",
+      "description": "Analysis revealed potential issues with the \"Generate All\" functionality",
+      "affectedAreas": [
+        "Style Application System",
+        "Gallery Service"
+      ],
+      "details": [
+        "Found 4 potential issues: Batch method lacks comprehensive error handling; Batch method may not handle demo mode properly; Batch apply handler lacks error handling; Batch apply handler may not show error messages to user"
+      ]
+    },
+    {
+      "issue": "Demo Mode Behavior",
+      "severity": "INFO",
+      "description": "Application is likely running in demo mode without database connection",
+      "affectedAreas": [
+        "All Admin Functions"
+      ],
+      "details": [
+        "This explains why batch operations might fail - no actual database to queue operations"
+      ]
+    }
+  ]
+}

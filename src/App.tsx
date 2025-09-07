@@ -38,7 +38,14 @@ const AppContent: React.FC = () => {
   // When bypassing auth, don't use auth loading state to prevent navigation loops
   const { loading: authLoading, user } = useAuth();
   const loading = BYPASS_AUTH ? false : authLoading;
-  const [stage, setStage] = useState<AppStage>('landing');
+  // Initialize stage based on URL hash for admin persistence
+  const getInitialStage = (): AppStage => {
+    if (window.location.hash === '#admin') return 'admin';
+    if (window.location.hash === '#tabs') return 'tabs';
+    return 'landing';
+  };
+  
+  const [stage, setStage] = useState<AppStage>(getInitialStage());
   const [activeTab, setActiveTab] = useState<TabId>('classic');
   const [currentProject, setCurrentProject] = useState<PreWeddingProject | null>(null);
   
@@ -197,6 +204,7 @@ const AppContent: React.FC = () => {
 
   const handleGetStarted = async () => {
     // Set stage to tabs view instead of bride
+    window.location.hash = '#tabs';
     setStage('tabs');
     
     // Create project in background without blocking the UI
@@ -271,7 +279,10 @@ const AppContent: React.FC = () => {
 
   // Show admin page
   if (stage === 'admin') {
-    return <AdminPage onBack={() => setStage('tabs')} />;
+    return <AdminPage onBack={() => {
+      window.location.hash = '#tabs';
+      setStage('tabs');
+    }} />;
   }
 
   // Show new tab-based interface
@@ -397,6 +408,7 @@ const AppContent: React.FC = () => {
                 onClick={() => {
                   try {
                     AuthService.requireAdmin(user);
+                    window.location.hash = '#admin';
                     setStage('admin');
                   } catch (error) {
                     alert('Access denied. Admin privileges required.');
