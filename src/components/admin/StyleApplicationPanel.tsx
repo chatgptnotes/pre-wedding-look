@@ -14,18 +14,24 @@ interface StyleApplicationPanelProps {
 
 const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }) => {
   const [countries, setCountries] = useState<Country[]>([]);
+  const [countriesWithModels, setCountriesWithModels] = useState<CountryWithModels[]>([]);
   const [styles, setStyles] = useState<Style[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>('IN');
   const [selectedRole, setSelectedRole] = useState<ModelRole>('bride');
   const [selectedStyleType, setSelectedStyleType] = useState<StyleType>('attire');
   const [queueItems, setQueueItems] = useState<GenerationQueueItem[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [applyingStyles, setApplyingStyles] = useState<Set<string>>(new Set());
+  const [savingImageId, setSavingImageId] = useState<string | null>(null);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCountries();
+    loadCountriesWithModels();
     loadStyles();
     loadQueueStatus();
+    loadGeneratedImages();
     
     // Subscribe to queue updates
     const subscription = GalleryService.subscribeToQueueUpdates(() => {
@@ -39,7 +45,12 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
 
   useEffect(() => {
     loadStyles();
+    loadGeneratedImages();
   }, [selectedStyleType, selectedRole]);
+
+  useEffect(() => {
+    loadGeneratedImages();
+  }, [selectedCountry]);
 
   const loadCountries = async () => {
     try {
@@ -47,6 +58,27 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
       setCountries(data);
     } catch (error) {
       console.error('Error loading countries:', error);
+    }
+  };
+
+  const loadCountriesWithModels = async () => {
+    try {
+      const data = await GalleryService.getCountriesWithModels();
+      setCountriesWithModels(data);
+    } catch (error) {
+      console.error('Error loading countries with models:', error);
+    }
+  };
+
+  const loadGeneratedImages = async () => {
+    try {
+      const data = await GalleryService.getGeneratedImages({
+        country: selectedCountry,
+        role: selectedRole
+      });
+      setGeneratedImages(data);
+    } catch (error) {
+      console.error('Error loading generated images:', error);
     }
   };
 
@@ -86,13 +118,24 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
         variations: 1,
         priority: 0
       });
+
+      // Log the action
+      await GalleryService.logStyleApplicationAction(
+        'apply',
+        selectedCountry,
+        selectedRole,
+        styleId,
+        undefined,
+        { variations: 1, priority: 0 }
+      );
       
       // Show success toast
       showToast('Style applied successfully in demo mode!', 'success');
       
-      // Reload queue status with a small delay to ensure state updates
+      // Reload queue status and generated images
       setTimeout(async () => {
         await loadQueueStatus();
+        await loadGeneratedImages();
       }, 100);
       
     } catch (error) {
@@ -105,6 +148,89 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
         newSet.delete(styleId);
         return newSet;
       });
+    }
+  };
+
+  const handleSaveImage = async (imageId: string) => {
+    try {
+      setSavingImageId(imageId);
+      await GalleryService.saveGeneratedImage(imageId);
+      
+      // Log the action
+      await GalleryService.logStyleApplicationAction(
+        'save',
+        selectedCountry,
+        selectedRole,
+        undefined,
+        imageId
+      );
+      
+      showToast('Image saved successfully!', 'success');
+      await loadGeneratedImages();
+    } catch (error) {
+      console.error('Error saving image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save image';
+      showToast(errorMessage, 'error');
+    } finally {
+      setSavingImageId(null);
+    }
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!confirm('Are you sure you want to delete this generated image?')) {
+      return;
+    }
+
+    try {
+      setDeletingImageId(imageId);
+      await GalleryService.deleteGeneratedImage(imageId);
+      
+      // Log the action
+      await GalleryService.logStyleApplicationAction(
+        'delete',
+        selectedCountry,
+        selectedRole,
+        undefined,
+        imageId
+      );
+      
+      showToast('Image deleted successfully!', 'success');
+      await loadGeneratedImages();
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete image';
+      showToast(errorMessage, 'error');
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
+  const handleStartOver = async () => {
+    if (!confirm('Are you sure you want to delete all generated images and start over?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await GalleryService.clearGeneratedImages(selectedCountry, selectedRole);
+      
+      // Log the action
+      await GalleryService.logStyleApplicationAction(
+        'clear',
+        selectedCountry,
+        selectedRole,
+        undefined,
+        undefined,
+        { cleared_all: true }
+      );
+      
+      showToast('All images cleared. You can start over!', 'success');
+      await loadGeneratedImages();
+    } catch (error) {
+      console.error('Error clearing images:', error);
+      showToast('Failed to clear images', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,6 +271,8 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
   };
 
   const currentCountry = countries.find(c => c.iso_code === selectedCountry);
+  const currentCountryWithModels = countriesWithModels.find(c => c.iso_code === selectedCountry);
+  const currentModel = currentCountryWithModels?.models?.[selectedRole];
   const pendingCount = queueItems.filter(item => item.status === 'pending').length;
   const processingCount = queueItems.filter(item => item.status === 'processing').length;
 
@@ -269,6 +397,134 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
       {!loading && styles.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500">No styles found for the selected filters</p>
+        </div>
+      )}
+
+      {/* Current Model Display */}
+      {currentModel && (
+        <div className="mt-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+          <h3 className="text-lg font-semibold mb-3 text-gray-800">
+            Current {selectedRole === 'bride' ? '👰 Bride' : '🤵 Groom'} Model for {currentCountry?.flag_emoji} {currentCountry?.name}
+          </h3>
+          <div className="flex items-center space-x-4">
+            <img
+              src={currentModel.source_image_url}
+              alt={`${currentCountry?.name} ${selectedRole} model`}
+              className="w-20 h-20 object-cover rounded-lg border-2 border-white shadow-md"
+              onError={(e) => {
+                console.log('Model image failed to load:', currentModel.source_image_url);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <div className="text-sm text-gray-600">
+              <p><strong>Model ID:</strong> {currentModel.id}</p>
+              <p><strong>Uploaded:</strong> {new Date(currentModel.created_at).toLocaleDateString()}</p>
+              <p className="text-green-600"><strong>✓ Ready for Style Application</strong></p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Model Missing Warning */}
+      {!currentModel && (
+        <div className="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+            </svg>
+            <div>
+              <h4 className="font-semibold text-yellow-800">No {selectedRole} Model Available</h4>
+              <p className="text-sm text-yellow-700">Please upload a {selectedRole} model for {currentCountry?.name} in the Country Models Manager before applying styles.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generated Images Gallery */}
+      {generatedImages.length > 0 && (
+        <div className="mt-8 bg-white rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-800">
+              Generated Images ({generatedImages.length})
+            </h3>
+            <button
+              onClick={handleStartOver}
+              disabled={loading}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              🔄 Start Over
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {generatedImages.map((image) => (
+              <div key={image.id} className="bg-gray-50 rounded-lg p-4">
+                <img
+                  src={image.image_url}
+                  alt={`Generated ${selectedRole} with style`}
+                  className="w-full h-48 object-cover rounded-lg mb-3"
+                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">
+                      {image.style_name || 'Style Applied'}
+                    </span>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      image.is_saved 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {image.is_saved ? 'Saved' : 'Temporary'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    {!image.is_saved && (
+                      <button
+                        onClick={() => handleSaveImage(image.id)}
+                        disabled={savingImageId === image.id}
+                        className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                      >
+                        {savingImageId === image.id ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving...
+                          </>
+                        ) : (
+                          <>💾 Save</>
+                        )}
+                      </button>
+                    )}
+                    
+                    <button
+                      onClick={() => handleDeleteImage(image.id)}
+                      disabled={deletingImageId === image.id}
+                      className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                    >
+                      {deletingImageId === image.id ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>🗑️ Delete</>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="text-xs text-gray-500">
+                    Generated: {new Date(image.created_at).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

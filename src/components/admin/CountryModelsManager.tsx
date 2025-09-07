@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { GalleryService } from '../../services/galleryService';
 import type { Country, CountryModel, ModelRole, CountryWithModels } from '../../types/gallery';
 
+interface PendingUpload {
+  countryIso: string;
+  role: ModelRole;
+  file: File;
+  previewUrl: string;
+}
+
 const CountryModelsManager: React.FC = () => {
   const [countries, setCountries] = useState<CountryWithModels[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>('IN');
@@ -9,6 +16,8 @@ const CountryModelsManager: React.FC = () => {
   const [uploadingRole, setUploadingRole] = useState<ModelRole | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadCountriesWithModels();
@@ -55,57 +64,120 @@ const CountryModelsManager: React.FC = () => {
       setSuccessMessage('');
 
       console.log('Debug: Starting upload for', countryIso, role);
-      console.log('Debug: Countries array:', countries);
 
-      // Get country
-      const country = countries.find(c => c.iso_code === countryIso);
-      if (!country) {
-        console.error('Debug: Country not found. Available countries:', countries.map(c => c.iso_code));
-        throw new Error(`Country not found: ${countryIso}. Available: ${countries.map(c => c.iso_code).join(', ')}`);
-      }
+      // Create preview URL for immediate display
+      const previewUrl = URL.createObjectURL(file);
 
-      console.log('Debug: Found country:', country);
-
-      // Upload image to storage
-      console.log('Debug: Uploading image to storage...');
-      const { url, path, sha256 } = await GalleryService.uploadModelImage(
-        file,
+      // Add to pending uploads
+      const pendingUpload: PendingUpload = {
         countryIso,
-        role
-      );
-
-      console.log('Debug: Image uploaded successfully:', { url, path, sha256 });
-
-      // Create or update model in database
-      console.log('Debug: Creating/updating model in database...');
-      await GalleryService.createOrUpdateModel(
-        country.id,
         role,
-        url,
-        path,
-        sha256,
-        {
-          uploaded_at: new Date().toISOString(),
-          file_name: file.name,
-          file_size: file.size
-        }
-      );
+        file,
+        previewUrl
+      };
 
-      console.log('Debug: Model created/updated successfully');
-      setSuccessMessage(`Successfully uploaded ${role} model for ${country.name}`);
-      
-      // Clear error messages on success
-      setErrorMessage('');
-      
-      // Reload countries to show new model with a small delay to ensure state updates
-      setTimeout(async () => {
+      setPendingUploads(prev => {
+        // Remove any existing upload for same country/role
+        const filtered = prev.filter(p => !(p.countryIso === countryIso && p.role === role));
+        return [...filtered, pendingUpload];
+      });
+
+      // Create demo model for immediate preview
+      const country = countries.find(c => c.iso_code === countryIso);
+      if (country) {
+        const { url, path, sha256 } = await GalleryService.uploadModelImage(
+          file,
+          countryIso,
+          role,
+          false // Demo mode only
+        );
+
+        await GalleryService.createOrUpdateModel(
+          country.id,
+          role,
+          url,
+          path,
+          sha256,
+          {
+            uploaded_at: new Date().toISOString(),
+            file_name: file.name,
+            file_size: file.size
+          },
+          false // Demo mode only
+        );
+
+        console.log('Debug: Demo model created for preview');
+        setSuccessMessage(`${role.charAt(0).toUpperCase() + role.slice(1)} model staged for upload. Click "Save All" to store permanently.`);
+        
+        // Reload countries to show new model
         await loadCountriesWithModels();
-      }, 100);
+      }
     } catch (error) {
       console.error('Error uploading model:', error);
       setErrorMessage(`Failed to upload ${role} model: ${error.message || 'Unknown error'}`);
     } finally {
       setUploadingRole(null);
+    }
+  };
+
+  const handleSaveAll = async () => {
+    if (pendingUploads.length === 0) {
+      setErrorMessage('No pending uploads to save');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      console.log('Debug: Saving all pending uploads to Supabase:', pendingUploads);
+
+      for (const upload of pendingUploads) {
+        console.log(`Debug: Saving ${upload.role} model for ${upload.countryIso}`);
+
+        // Get country
+        const country = countries.find(c => c.iso_code === upload.countryIso);
+        if (!country) {
+          throw new Error(`Country not found: ${upload.countryIso}`);
+        }
+
+        // Upload to Supabase storage
+        const { url, path, sha256 } = await GalleryService.uploadModelImage(
+          upload.file,
+          upload.countryIso,
+          upload.role,
+          true // Save to storage
+        );
+
+        // Save model to database
+        await GalleryService.createOrUpdateModel(
+          country.id,
+          upload.role,
+          url,
+          path,
+          sha256,
+          {
+            uploaded_at: new Date().toISOString(),
+            file_name: upload.file.name,
+            file_size: upload.file.size
+          },
+          true // Save to database
+        );
+      }
+
+      // Clear pending uploads
+      setPendingUploads([]);
+      setSuccessMessage(`Successfully saved ${pendingUploads.length} model(s) to database`);
+
+      // Reload countries to show updated models
+      await loadCountriesWithModels();
+
+    } catch (error) {
+      console.error('Error saving models:', error);
+      setErrorMessage(`Failed to save models: ${error.message || 'Unknown error'}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -168,6 +240,29 @@ const CountryModelsManager: React.FC = () => {
             onUpload={handleFileUpload}
             isUploading={uploadingRole === 'groom'}
           />
+        </div>
+      )}
+
+      {/* Save All Button */}
+      {pendingUploads.length > 0 && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={handleSaveAll}
+            disabled={saving}
+            className="px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? (
+              <div className="flex items-center">
+                <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving to Database...
+              </div>
+            ) : (
+              `Save All Models (${pendingUploads.length})`
+            )}
+          </button>
         </div>
       )}
 

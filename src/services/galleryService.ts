@@ -177,18 +177,16 @@ export class GalleryService {
     imageUrl: string,
     imagePath: string,
     sha256: string,
-    metadata?: any
+    metadata?: any,
+    saveToDatabase = false
   ): Promise<CountryModel> {
-    console.log('Debug: createOrUpdateModel called with:', { countryId, role, imageUrl });
-    
-    // Always use demo mode for development to avoid RLS issues
-    console.log('Debug: Using demo mode for model creation and storing in memory');
+    console.log('Debug: createOrUpdateModel called with:', { countryId, role, imageUrl, saveToDatabase });
     
     const model: CountryModel = {
-      id: `demo-${countryId}-${role}`,
+      id: saveToDatabase ? `${countryId}-${role}` : `demo-${countryId}-${role}`,
       country_id: countryId,
       role,
-      name: `Demo ${role}`,
+      name: `${role.charAt(0).toUpperCase() + role.slice(1)} Model`,
       source_image_url: imageUrl,
       source_image_path: imagePath,
       source_image_sha256: sha256,
@@ -201,14 +199,50 @@ export class GalleryService {
       updated_at: new Date().toISOString()
     };
     
-    // Store in demo storage
-    const key = this.getDemoModelKey(countryId, role);
-    this.demoModels.set(key, model);
-    
-    console.log('Debug: Model stored in demo storage:', { key, model });
-    console.log('Debug: Current demo storage:', Array.from(this.demoModels.entries()));
-    
-    return model;
+    if (saveToDatabase && this.checkSupabase()) {
+      console.log('Debug: Saving model to Supabase database');
+      
+      // Deactivate existing model for this country/role
+      await supabase!
+        .from('country_models')
+        .update({ is_active: false })
+        .eq('country_id', countryId)
+        .eq('role', role);
+      
+      // Create new active model
+      const { data, error } = await supabase!
+        .from('country_models')
+        .insert({
+          country_id: countryId,
+          role,
+          source_image_url: imageUrl,
+          source_image_path: imagePath,
+          source_image_sha256: sha256,
+          metadata,
+          is_active: true,
+          created_by: (await supabase!.auth.getUser()).data.user?.id
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error creating country model:', error);
+        throw error;
+      }
+      
+      console.log('Debug: Model saved to Supabase:', data);
+      return data;
+    } else {
+      console.log('Debug: Using demo mode for model creation and storing in memory');
+      
+      // Store in demo storage
+      const key = this.getDemoModelKey(countryId, role);
+      this.demoModels.set(key, model);
+      
+      console.log('Debug: Model stored in demo storage:', { key, model });
+      
+      return model;
+    }
   }
 
   // ==================== Styles ====================
@@ -560,24 +594,56 @@ export class GalleryService {
   static async uploadModelImage(
     file: File,
     iso: string,
-    role: ModelRole
+    role: ModelRole,
+    saveToStorage = false
   ): Promise<{ url: string; path: string; sha256: string }> {
-    console.log('Debug: uploadModelImage called with:', { iso, role, fileName: file.name });
+    console.log('Debug: uploadModelImage called with:', { iso, role, fileName: file.name, saveToStorage });
     
-    // Always use demo mode for development to avoid storage issues
-    console.log('Debug: Using demo mode for image upload');
+    // Generate SHA256 hash of file
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
-    // Create object URL for preview and track it for cleanup
-    const url = URL.createObjectURL(file);
-    this.objectUrls.add(url);
-    const path = `demo/countries/${iso}/${role}/source-${Date.now()}.jpg`;
-    
-    console.log('Debug: Generated demo upload result:', { url, path, sha256 });
-    return { url, path, sha256 };
+    if (saveToStorage && this.checkSupabase()) {
+      console.log('Debug: Uploading to Supabase storage');
+      
+      // Upload to storage
+      const path = `countries/${iso}/${role}/source-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase!.storage
+        .from('faces')
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: true
+        });
+      
+      if (uploadError) {
+        console.error('Error uploading model image:', uploadError);
+        throw uploadError;
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase!.storage
+        .from('faces')
+        .getPublicUrl(path);
+      
+      console.log('Debug: Uploaded to Supabase storage:', { publicUrl, path, sha256 });
+      return {
+        url: publicUrl,
+        path,
+        sha256
+      };
+    } else {
+      console.log('Debug: Using demo mode for image upload');
+      
+      // Create object URL for preview and track it for cleanup
+      const url = URL.createObjectURL(file);
+      this.objectUrls.add(url);
+      const path = `demo/countries/${iso}/${role}/source-${Date.now()}.jpg`;
+      
+      console.log('Debug: Generated demo upload result:', { url, path, sha256 });
+      return { url, path, sha256 };
+    }
   }
 
   // Clean up object URLs to prevent memory leaks
@@ -715,5 +781,151 @@ export class GalleryService {
         callback
       )
       .subscribe();
+  }
+
+  // ==================== Generated Image Management ====================
+  
+  static async saveGeneratedImage(imageId: string): Promise<void> {
+    console.log('Debug: saveGeneratedImage called for image:', imageId);
+    
+    if (!this.checkSupabase()) {
+      // In demo mode, just mark as saved in memory
+      const image = this.demoGeneratedImages.get(imageId);
+      if (image) {
+        image.is_saved = true;
+        image.updated_at = new Date().toISOString();
+        console.log('Debug: Image marked as saved in demo mode');
+      } else {
+        throw new Error('Image not found in demo storage');
+      }
+      return;
+    }
+
+    const { error } = await supabase
+      .from('generated_images')
+      .update({ 
+        is_saved: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', imageId);
+
+    if (error) {
+      console.error('Error saving image:', error);
+      throw error;
+    }
+
+    console.log('Debug: Image saved to database');
+  }
+
+  static async deleteGeneratedImage(imageId: string): Promise<void> {
+    console.log('Debug: deleteGeneratedImage called for image:', imageId);
+    
+    if (!this.checkSupabase()) {
+      // In demo mode, remove from memory
+      const image = this.demoGeneratedImages.get(imageId);
+      if (image && image.image_url) {
+        // Clean up object URL if it's a demo image
+        if (this.objectUrls.has(image.image_url)) {
+          URL.revokeObjectURL(image.image_url);
+          this.objectUrls.delete(image.image_url);
+        }
+      }
+      this.demoGeneratedImages.delete(imageId);
+      console.log('Debug: Image deleted from demo storage');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('generated_images')
+      .delete()
+      .eq('id', imageId);
+
+    if (error) {
+      console.error('Error deleting image:', error);
+      throw error;
+    }
+
+    console.log('Debug: Image deleted from database');
+  }
+
+  static async clearGeneratedImages(countryIso: string, role: ModelRole): Promise<void> {
+    console.log('Debug: clearGeneratedImages called for:', { countryIso, role });
+    
+    if (!this.checkSupabase()) {
+      // In demo mode, clear matching images from memory
+      const keysToDelete: string[] = [];
+      this.demoGeneratedImages.forEach((image, key) => {
+        if (image.country_iso === countryIso && image.role === role) {
+          // Clean up object URL if it's a demo image
+          if (image.image_url && this.objectUrls.has(image.image_url)) {
+            URL.revokeObjectURL(image.image_url);
+            this.objectUrls.delete(image.image_url);
+          }
+          keysToDelete.push(key);
+        }
+      });
+      keysToDelete.forEach(key => this.demoGeneratedImages.delete(key));
+      console.log('Debug: Cleared', keysToDelete.length, 'images from demo storage');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('generated_images')
+      .delete()
+      .eq('country_iso', countryIso)
+      .eq('role', role);
+
+    if (error) {
+      console.error('Error clearing images:', error);
+      throw error;
+    }
+
+    console.log('Debug: Images cleared from database');
+  }
+
+  // ==================== Action Tracking ====================
+  
+  static async logStyleApplicationAction(
+    action: 'apply' | 'save' | 'delete' | 'clear',
+    countryIso: string,
+    role: ModelRole,
+    styleId?: string,
+    imageId?: string,
+    metadata?: any
+  ): Promise<void> {
+    console.log('Debug: logStyleApplicationAction called:', { action, countryIso, role, styleId, imageId });
+    
+    if (!this.checkSupabase()) {
+      // In demo mode, just log to console
+      console.log('Demo mode: Style application action logged:', {
+        action,
+        countryIso,
+        role,
+        styleId,
+        imageId,
+        metadata,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('style_application_logs')
+      .insert({
+        action,
+        country_iso: countryIso,
+        role,
+        style_id: styleId,
+        image_id: imageId,
+        metadata,
+        created_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error logging style application action:', error);
+      // Don't throw error for logging failures to avoid disrupting the main flow
+    } else {
+      console.log('Debug: Style application action logged to database');
+    }
   }
 }
