@@ -268,8 +268,8 @@ export class GalleryService {
   static async getCountryModels(countryId: string): Promise<{ bride?: CountryModel; groom?: CountryModel }> {
     console.log('Debug: getCountryModels called for countryId:', countryId);
     
-    if (!this.isSupabaseAvailable()) {
-      // Return demo models
+    // Helper function to create and return demo models
+    const createDemoModels = () => {
       console.log('Debug: Using demo models for countryId:', countryId);
       const brideKey = this.getDemoModelKey(countryId, 'bride');
       const groomKey = this.getDemoModelKey(countryId, 'groom');
@@ -301,6 +301,11 @@ export class GalleryService {
         bride: this.demoModels.get(brideKey),
         groom: this.demoModels.get(groomKey)
       };
+    };
+    
+    if (!this.isSupabaseAvailable()) {
+      // Return demo models when Supabase isn't available
+      return createDemoModels();
     }
 
     try {
@@ -315,13 +320,7 @@ export class GalleryService {
         console.error('Error fetching country models from database:', error);
         console.log('🔄 Falling back to demo models due to database error');
         // Fall back to demo models on database error
-        const brideKey = this.getDemoModelKey(countryId, 'bride');
-        const groomKey = this.getDemoModelKey(countryId, 'groom');
-        
-        return {
-          bride: this.demoModels.get(brideKey),
-          groom: this.demoModels.get(groomKey)
-        };
+        return createDemoModels();
       }
       
       const models = data || [];
@@ -342,13 +341,7 @@ export class GalleryService {
       console.error('Database connection failed for country models:', dbError);
       console.log('🔄 Falling back to demo models due to connection error');
       // Fall back to demo models on connection error
-      const brideKey = this.getDemoModelKey(countryId, 'bride');
-      const groomKey = this.getDemoModelKey(countryId, 'groom');
-      
-      return {
-        bride: this.demoModels.get(brideKey),
-        groom: this.demoModels.get(groomKey)
-      };
+      return createDemoModels();
     }
   }
 
