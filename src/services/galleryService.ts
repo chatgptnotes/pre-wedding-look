@@ -14,9 +14,54 @@ import type {
 } from '../types/gallery';
 
 export class GalleryService {
+  // Check if Supabase is available
+  private static checkSupabase() {
+    if (!supabase) {
+      console.warn('Supabase not configured. Using demo mode.');
+      return false;
+    }
+    return true;
+  }
+
   // ==================== Countries ====================
   
   static async getCountries(activeOnly = true): Promise<Country[]> {
+    if (!this.checkSupabase()) {
+      // Return demo countries when Supabase isn't available
+      return [
+        {
+          id: '1',
+          iso_code: 'IN',
+          name: 'India',
+          flag_emoji: '🇮🇳',
+          cultural_styles: ['traditional', 'bollywood', 'royal'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          iso_code: 'US',
+          name: 'United States',
+          flag_emoji: '🇺🇸',
+          cultural_styles: ['modern', 'vintage', 'hollywood'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '3',
+          iso_code: 'JP',
+          name: 'Japan',
+          flag_emoji: '🇯🇵',
+          cultural_styles: ['traditional', 'kimono', 'modern'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
+    }
+
     let query = supabase.from('countries').select('*');
     
     if (activeOnly) {
@@ -34,6 +79,12 @@ export class GalleryService {
   }
 
   static async getCountryByISO(iso: string): Promise<Country | null> {
+    if (!this.checkSupabase()) {
+      // Return demo country data
+      const countries = await this.getCountries();
+      return countries.find(c => c.iso_code === iso) || null;
+    }
+
     const { data, error } = await supabase
       .from('countries')
       .select('*')
@@ -72,6 +123,11 @@ export class GalleryService {
   }
 
   static async getCountryModelByRole(iso: string, role: ModelRole): Promise<CountryModel | null> {
+    if (!this.checkSupabase()) {
+      // In demo mode, return null since no models are uploaded yet
+      return null;
+    }
+
     const { data, error } = await supabase
       .rpc('get_country_model', { 
         p_country_iso: iso, 
@@ -94,6 +150,26 @@ export class GalleryService {
     sha256: string,
     metadata?: any
   ): Promise<CountryModel> {
+    if (!this.checkSupabase()) {
+      // In demo mode, return a mock model
+      return {
+        id: `demo-${countryId}-${role}`,
+        country_id: countryId,
+        role,
+        name: `Demo ${role}`,
+        source_image_url: imageUrl,
+        source_image_path: imagePath,
+        source_image_sha256: sha256,
+        thumbnail_url: imageUrl,
+        face_encoding: null,
+        metadata: metadata || {},
+        is_active: true,
+        created_by: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+    }
+
     // Deactivate existing model for this country/role
     await supabase
       .from('country_models')
@@ -133,6 +209,85 @@ export class GalleryService {
     culturalTags?: string[];
     activeOnly?: boolean;
   }): Promise<Style[]> {
+    if (!this.checkSupabase()) {
+      // Return demo styles when Supabase isn't available
+      const demoStyles: Style[] = [
+        {
+          id: '1',
+          name: 'Red Lehenga',
+          type: 'attire',
+          category: 'bride',
+          prompt_template: {
+            positive: 'a stunning, intricately embroidered red lehenga',
+            negative: 'low quality, blurry',
+            params: { strength: 0.8 }
+          },
+          cultural_tags: ['indian', 'traditional', 'wedding'],
+          preview_url: null,
+          thumbnail_url: null,
+          asset_refs: [],
+          is_active: true,
+          sort_order: 1,
+          created_at: new Date().toISOString(),
+          created_by: null,
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          name: 'Classic Sherwani',
+          type: 'attire',
+          category: 'groom',
+          prompt_template: {
+            positive: 'a classic cream-colored sherwani with a turban',
+            negative: 'low quality, blurry',
+            params: { strength: 0.8 }
+          },
+          cultural_tags: ['indian', 'traditional', 'wedding'],
+          preview_url: null,
+          thumbnail_url: null,
+          asset_refs: [],
+          is_active: true,
+          sort_order: 2,
+          created_at: new Date().toISOString(),
+          created_by: null,
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '3',
+          name: 'Elegant Updo',
+          type: 'hairstyle',
+          category: 'bride',
+          prompt_template: {
+            positive: 'an elegant, intricate updo with some loose strands framing her face',
+            negative: 'messy hair, unkempt',
+            params: { strength: 0.7 }
+          },
+          cultural_tags: ['elegant', 'formal', 'wedding'],
+          preview_url: null,
+          thumbnail_url: null,
+          asset_refs: [],
+          is_active: true,
+          sort_order: 3,
+          created_at: new Date().toISOString(),
+          created_by: null,
+          updated_at: new Date().toISOString()
+        }
+      ];
+      
+      // Apply filters if provided
+      let filteredStyles = demoStyles;
+      
+      if (filters?.type) {
+        filteredStyles = filteredStyles.filter(style => style.type === filters.type);
+      }
+      
+      if (filters?.category) {
+        filteredStyles = filteredStyles.filter(style => style.category === filters.category);
+      }
+      
+      return filteredStyles;
+    }
+
     let query = supabase.from('styles').select('*');
     
     if (filters?.type) {
@@ -243,6 +398,32 @@ export class GalleryService {
   // ==================== Generation Queue ====================
   
   static async addToQueue(request: ApplyStyleRequest): Promise<GenerationQueueItem> {
+    if (!this.checkSupabase()) {
+      // In demo mode, return a mock queue item
+      const country = await this.getCountryByISO(request.iso);
+      if (!country) {
+        throw new Error(`Country not found: ${request.iso}`);
+      }
+      
+      return {
+        id: `demo-queue-${Date.now()}`,
+        country_id: country.id,
+        model_id: `demo-${country.id}-${request.role}`,
+        style_id: request.styleId,
+        role: request.role,
+        status: 'pending',
+        priority: request.priority || 0,
+        progress: 0,
+        variations: request.variations || 1,
+        error_message: null,
+        retry_count: 0,
+        created_by: null,
+        created_at: new Date().toISOString(),
+        started_at: null,
+        completed_at: null
+      };
+    }
+
     const country = await this.getCountryByISO(request.iso);
     if (!country) {
       throw new Error(`Country not found: ${request.iso}`);
@@ -349,6 +530,20 @@ export class GalleryService {
     iso: string,
     role: ModelRole
   ): Promise<{ url: string; path: string; sha256: string }> {
+    if (!this.checkSupabase()) {
+      // In demo mode, create a fake URL using file data
+      const buffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      // Create object URL for preview
+      const url = URL.createObjectURL(file);
+      const path = `demo/countries/${iso}/${role}/source-${Date.now()}.jpg`;
+      
+      return { url, path, sha256 };
+    }
+
     // Generate SHA256 hash of file
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -416,6 +611,18 @@ export class GalleryService {
   static async getCountriesWithModels(): Promise<CountryWithModels[]> {
     const countries = await this.getCountries();
     
+    if (!this.checkSupabase()) {
+      // Return demo data when Supabase isn't available
+      return countries.map(country => ({
+        ...country,
+        models: {
+          bride: null,
+          groom: null
+        },
+        imageCount: 0
+      }));
+    }
+
     const countriesWithModels = await Promise.all(
       countries.map(async (country) => {
         const models = await this.getCountryModels(country.id);
