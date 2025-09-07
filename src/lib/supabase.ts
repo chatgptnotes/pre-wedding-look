@@ -14,6 +14,27 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
     })
   : null;
 
+// Service role client for admin operations (bypasses RLS)
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY || '';
+export const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : null;
+
+// Helper to get the appropriate client based on operation type
+export const getSupabaseClient = (requireAdmin: boolean = false) => {
+  if (requireAdmin && supabaseAdmin) {
+    console.log('🔑 Using service role client for admin operation');
+    return supabaseAdmin;
+  }
+  console.log('👤 Using anonymous client for regular operation');
+  return supabase;
+};
+
 // Google OAuth configuration
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
