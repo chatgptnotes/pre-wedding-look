@@ -97,7 +97,7 @@ const CountryModelsManager: React.FC = () => {
           file,
           countryIso,
           role,
-          false // Demo mode only
+          !isDemoMode // Use storage if not in demo mode
         );
 
         await GalleryService.createOrUpdateModel(
@@ -111,11 +111,16 @@ const CountryModelsManager: React.FC = () => {
             file_name: file.name,
             file_size: file.size
           },
-          false // Demo mode only
+          !isDemoMode // Use database if not in demo mode
         );
 
-        console.log('Debug: Demo model created for preview');
-        setSuccessMessage(`${role.charAt(0).toUpperCase() + role.slice(1)} model staged for upload. Click "Save All" to store permanently.`);
+        if (isDemoMode) {
+          console.log('Debug: Demo model created for preview');
+          setSuccessMessage(`${role.charAt(0).toUpperCase() + role.slice(1)} model staged for upload. Click "Save All" to store permanently.`);
+        } else {
+          console.log('Debug: Model saved to database immediately');
+          setSuccessMessage(`${role.charAt(0).toUpperCase() + role.slice(1)} model uploaded and saved successfully!`);
+        }
         
         // Reload countries to show new model
         await loadCountriesWithModels();

@@ -37,6 +37,52 @@ export class ImageStorageService {
     return Promise.race([promise, timeout]);
   }
 
+  // Upload base64 image to Supabase storage
+  static async uploadBase64Image(
+    base64Image: string,
+    filePath: string
+  ): Promise<{ publicUrl: string; path: string } | null> {
+    if (!supabase) {
+      console.warn('Supabase not initialized, skipping storage upload');
+      return null;
+    }
+
+    try {
+      // Convert base64 to blob
+      const imageBlob = await this.urlToBlob(base64Image);
+      
+      // Upload to storage
+      const { data, error } = await this.withTimeout(
+        supabase.storage
+          .from('pre-wedding-images')
+          .upload(filePath, imageBlob, {
+            contentType: imageBlob.type || 'image/jpeg',
+            upsert: true
+          }),
+        30000, // 30 second timeout
+        'Upload to storage'
+      );
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return null;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('pre-wedding-images')
+        .getPublicUrl(data.path);
+
+      return {
+        publicUrl: urlData.publicUrl,
+        path: data.path
+      };
+    } catch (error) {
+      console.error('Error uploading base64 image:', error);
+      return null;
+    }
+  }
+
   // Upload image to Supabase storage
   static async uploadImageToStorage(
     imageBlob: Blob, 

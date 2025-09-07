@@ -182,18 +182,28 @@ const BananaChallengeTab: React.FC<BananaChallengeTabProps> = ({
     setIsGenerating(true);
     
     try {
-      // Simulate AI processing
-      await new Promise(resolve => setTimeout(resolve, 3500));
+      // Import the Gemini service
+      const { generateBananaChallengeImage } = await import('../../services/geminiService');
       
-      // Mock generated image
-      const themeName = selectedTheme.name.replace(/\s+/g, '+');
-      setGeneratedImage(`https://api.placeholder.com/800x600/ff69b4/fff?text=${themeName}+Challenge`);
+      // Generate the crazy banana challenge image using AI
+      const generatedImageUrl = await generateBananaChallengeImage(
+        selectedTheme,
+        brideImage,
+        groomImage
+      );
+      
+      setGeneratedImage(generatedImageUrl);
       
       // Mark challenge as completed
       setChallengeCompleted(prev => [...prev, selectedTheme.id]);
     } catch (error) {
       console.error('Error generating banana challenge:', error);
       alert('Failed to generate challenge. Please try again.');
+      
+      // Fallback to mock image if AI fails
+      const themeName = selectedTheme.name.replace(/\s+/g, '+');
+      setGeneratedImage(`https://api.placeholder.com/800x600/ff69b4/fff?text=${themeName}+Challenge`);
+      setChallengeCompleted(prev => [...prev, selectedTheme.id]);
     } finally {
       setIsGenerating(false);
     }
@@ -227,6 +237,38 @@ const BananaChallengeTab: React.FC<BananaChallengeTabProps> = ({
               Completed: {challengeCompleted.length}/{BANANA_THEMES.length}
             </span>
           </div>
+        </div>
+
+        {/* Sample Gallery */}
+        <div className="mt-8 bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">🎨 Sample Banana Challenges</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="relative group cursor-pointer rounded-lg overflow-hidden bg-gradient-to-br from-purple-400 to-pink-400 h-32 flex items-center justify-center">
+              <div className="text-white text-center">
+                <div className="text-2xl mb-1">🤖</div>
+                <div className="text-xs font-medium">Cyberpunk Wedding</div>
+              </div>
+            </div>
+            <div className="relative group cursor-pointer rounded-lg overflow-hidden bg-gradient-to-br from-blue-400 to-teal-400 h-32 flex items-center justify-center">
+              <div className="text-white text-center">
+                <div className="text-2xl mb-1">🧜‍♀️</div>
+                <div className="text-xs font-medium">Mermaid Wedding</div>
+              </div>
+            </div>
+            <div className="relative group cursor-pointer rounded-lg overflow-hidden bg-gradient-to-br from-red-400 to-yellow-400 h-32 flex items-center justify-center">
+              <div className="text-white text-center">
+                <div className="text-2xl mb-1">🦸‍♂️</div>
+                <div className="text-xs font-medium">Superhero Couple</div>
+              </div>
+            </div>
+            <div className="relative group cursor-pointer rounded-lg overflow-hidden bg-gradient-to-br from-green-400 to-blue-400 h-32 flex items-center justify-center">
+              <div className="text-white text-center">
+                <div className="text-2xl mb-1">👽</div>
+                <div className="text-xs font-medium">Alien Planet</div>
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mt-4">Upload your photos and select a theme to create your own wild masterpiece!</p>
         </div>
       </div>
 
@@ -429,8 +471,40 @@ const BananaChallengeTab: React.FC<BananaChallengeTabProps> = ({
                 >
                   Try Another Challenge
                 </button>
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                  Share This Madness!
+                <button 
+                  onClick={async () => {
+                    try {
+                      // Save to Supabase database
+                      const { DatabaseService } = await import('../../services/databaseService');
+                      await DatabaseService.saveBananaChallengeResult({
+                        challenge_theme_id: selectedTheme!.id,
+                        challenge_theme_name: selectedTheme!.name,
+                        bride_image: brideImage!,
+                        groom_image: groomImage!,
+                        generated_image: generatedImage,
+                        completed_at: new Date().toISOString()
+                      });
+                      alert('Banana Challenge saved successfully! 🍌✨');
+                    } catch (error) {
+                      console.error('Error saving banana challenge:', error);
+                      // Still allow sharing even if database save fails
+                    }
+                    // Create shareable link
+                    const shareData = {
+                      title: `Banana Challenge: ${selectedTheme!.name}`,
+                      text: `Check out our wild ${selectedTheme!.name} pre-wedding photo! 🍌`,
+                      url: window.location.href
+                    };
+                    if (navigator.share) {
+                      navigator.share(shareData);
+                    } else {
+                      navigator.clipboard.writeText(`${shareData.title} - ${shareData.url}`);
+                      alert('Link copied to clipboard! Share your banana challenge! 🍌');
+                    }
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                >
+                  💾 Save & Share This Madness!
                 </button>
               </>
             )}

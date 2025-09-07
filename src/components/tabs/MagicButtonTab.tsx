@@ -121,15 +121,26 @@ const MagicButtonTab: React.FC<MagicButtonTabProps> = ({
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, step.duration || 3000));
       
-      // Generate mock results based on step type
+      // Execute real AI processing based on step type
       let result = '';
-      if (step.id === 'variations') {
-        // Generate mock image URLs for final results
-        const mockImages = Array.from({ length: 12 }, (_, i) => 
-          `https://api.placeholder.com/800x600/ff69b4/fff?text=Magic+Result+${i + 1}`
-        );
-        setCompletedImages(mockImages);
-        result = `Generated ${mockImages.length} variations`;
+      if (step.id === 'variations' && brideImage && groomImage) {
+        try {
+          // Import the AI generation service
+          const { generateMagicVariations } = await import('../../services/geminiService');
+          
+          // Generate real AI variations
+          const magicImages = await generateMagicVariations(brideImage, groomImage, 12);
+          setCompletedImages(magicImages);
+          result = `Generated ${magicImages.length} AI variations`;
+        } catch (error) {
+          console.error('AI generation failed:', error);
+          // Fallback to mock images
+          const fallbackImages = Array.from({ length: 12 }, (_, i) => 
+            `https://api.placeholder.com/800x600/ff69b4/fff?text=Magic+Result+${i + 1}`
+          );
+          setCompletedImages(fallbackImages);
+          result = `Generated ${fallbackImages.length} variations (fallback)`;
+        }
       } else {
         result = `${step.name} completed successfully`;
       }

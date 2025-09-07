@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeftIcon, ChevronRightIcon, PlayIcon, PauseIcon } from '@heroicons/react/24/solid';
+import { ChevronLeftIcon, ChevronRightIcon, PlayIcon, PauseIcon, ArrowDownTrayIcon } from '@heroicons/react/24/solid';
 import ImageUploader from '../ImageUploader';
 import HelpCard from '../HelpCard';
 import CustomPromptBuilder from '../CustomPromptBuilder';
 import { generateStoryboardScene } from '../../services/geminiService';
+import { GalleryService } from '../../services/galleryService';
 
 interface Scene {
   id: string;
@@ -109,6 +110,44 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({
       );
       
       console.log('Successfully generated scene:', currentScene.name);
+      
+      // Save generated storyboard scene to Supabase database
+      try {
+        const imageBlob = await fetch(generatedImageUrl).then(r => r.blob());
+        const generatedImageResult = await GalleryService.uploadGeneratedImage(imageBlob, 'IN', 'bride', `storyboard-${currentScene.id}`);
+        
+        // Create GeneratedImage record in database
+        const generatedImageRecord = {
+          id: `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          country_id: '1', // India
+          model_id: null,
+          style_id: null,
+          role: 'bride' as const,
+          image_url: generatedImageResult.url,
+          image_path: generatedImageResult.path,
+          thumbnail_url: generatedImageResult.url,
+          generation_params: {
+            scene_name: currentScene.name,
+            location: currentScene.location,
+            time_of_day: currentScene.timeOfDay,
+            description: currentScene.description,
+            generated_at: new Date().toISOString(),
+            type: 'storyboard_scene'
+          },
+          quality_score: 0.9,
+          user_ratings: [],
+          view_count: 0,
+          is_featured: false,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log('Saved storyboard scene to database:', generatedImageRecord);
+      } catch (dbError) {
+        console.error('Failed to save storyboard scene to database:', dbError);
+        // Continue anyway with the generated image
+      }
       
       setScenes(prev => prev.map((scene, idx) => 
         idx === sceneIndex ? { 
@@ -288,11 +327,27 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({
               {/* Generated Image Preview */}
               <div className="flex items-center justify-center">
                 {scenes[currentScene]?.generatedImage ? (
-                  <img
-                    src={scenes[currentScene].generatedImage}
-                    alt={scenes[currentScene].name}
-                    className="max-w-full h-auto rounded-lg shadow-lg"
-                  />
+                  <div className="relative">
+                    <img
+                      src={scenes[currentScene].generatedImage}
+                      alt={scenes[currentScene].name}
+                      className="max-w-full h-auto rounded-lg shadow-lg"
+                    />
+                    <button
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = scenes[currentScene].generatedImage!;
+                        link.download = `${scenes[currentScene].name.replace(/\s+/g, '_').toLowerCase()}_storyboard.jpg`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg transition-all duration-200"
+                      title="Download Storyboard Scene"
+                    >
+                      <ArrowDownTrayIcon className="w-5 h-5" />
+                    </button>
+                  </div>
                 ) : (
                   <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
                     <div className="text-center text-gray-500">
@@ -325,8 +380,23 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({
               <div className="text-lg mb-1">{scene.name.split(' ')[0]}</div>
               <div className="text-xs opacity-75">{scene.location}</div>
               {scene.generatedImage && (
-                <div className="mt-2 text-xs bg-green-200 text-green-800 rounded px-2 py-1">
-                  Generated
+                <div className="mt-2 flex flex-col gap-1">
+                  <div className="text-xs bg-green-200 text-green-800 rounded px-2 py-1">
+                    Generated & Saved
+                  </div>
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = scene.generatedImage!;
+                      link.download = `${scene.name.replace(/\s+/g, '_').toLowerCase()}_storyboard.jpg`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="text-xs bg-blue-500 hover:bg-blue-600 text-white rounded px-2 py-1 transition-colors"
+                  >
+                    Download
+                  </button>
                 </div>
               )}
             </button>

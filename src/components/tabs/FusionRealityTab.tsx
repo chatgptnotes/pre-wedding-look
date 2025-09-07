@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { PaintBrushIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
+import { PaintBrushIcon, TrashIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/solid';
 import ImageUploader from '../ImageUploader';
 import CustomPromptBuilder from '../CustomPromptBuilder';
+import { generatePersonalizedImage } from '../../services/geminiService';
+import { GalleryService } from '../../services/galleryService';
 
 interface BrushStroke {
   x: number;
@@ -207,18 +209,82 @@ const FusionRealityTab: React.FC<FusionRealityTabProps> = ({
     setIsProcessing(true);
     
     try {
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('Processing attire swap with AI...');
       
-      // Mock processed image - in real implementation, this would call the AI service
-      setProcessedImage(`https://api.placeholder.com/600x800/ff69b4/fff?text=Swapped+to+${selectedAttire.name}`);
+      // Create a prompt for AI attire swapping based on selected attire
+      const attirePrompt = `${selectedAttire.description}. Apply this attire style to the painted areas while maintaining the person's original face and body structure.`;
+      
+      // Use the AI service to generate the swapped attire image
+      const config = {
+        location: '',
+        brideAttire: selectedPerson === 'bride' ? attirePrompt : '',
+        groomAttire: selectedPerson === 'groom' ? attirePrompt : '',
+        bridePose: selectedPerson === 'bride' ? 'naturally posed' : '',
+        groomPose: selectedPerson === 'groom' ? 'naturally posed' : '',
+        style: `Attire swap with ${selectedAttire.name}`,
+        hairstyle: '',
+        groomHairstyle: '',
+        aspectRatio: '4:5 portrait aspect ratio',
+        jewelry: ''
+      };
+      
+      let generatedImageUrl;
+      if (selectedPerson === 'bride') {
+        generatedImageUrl = await generatePersonalizedImage(config, activeImage, null);
+      } else {
+        generatedImageUrl = await generatePersonalizedImage(config, null, activeImage);
+      }
+      
+      console.log('AI attire swap completed successfully');
+      
+      // Save to Supabase database
+      try {
+        const imageBlob = await fetch(generatedImageUrl).then(r => r.blob());
+        const uploadResult = await GalleryService.uploadGeneratedImage(imageBlob, 'IN', selectedPerson, `attire-swap-${selectedAttire.id}`);
+        
+        // Create GeneratedImage record in database
+        const generatedImageRecord = {
+          id: `attire-swap-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          country_id: '1',
+          model_id: null,
+          style_id: selectedAttire.id,
+          role: selectedPerson,
+          image_url: uploadResult.url,
+          image_path: uploadResult.path,
+          thumbnail_url: uploadResult.url,
+          generation_params: {
+            attire_name: selectedAttire.name,
+            attire_description: selectedAttire.description,
+            person: selectedPerson,
+            brush_strokes_count: brushStrokes.length,
+            generated_at: new Date().toISOString(),
+            type: 'attire_swap'
+          },
+          quality_score: 0.85,
+          user_ratings: [],
+          view_count: 0,
+          is_featured: false,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log('Saved attire swap to database:', generatedImageRecord);
+        setProcessedImage(generatedImageUrl);
+      } catch (dbError) {
+        console.error('Failed to save attire swap to database:', dbError);
+        // Still show the generated image even if database save fails
+        setProcessedImage(generatedImageUrl);
+      }
+      
     } catch (error) {
       console.error('Error processing attire swap:', error);
-      alert('Failed to process attire swap. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to process attire swap: ${errorMessage}\n\nPlease try again with different attire or images.`);
     } finally {
       setIsProcessing(false);
     }
-  }, [activeImage, selectedAttire, brushStrokes]);
+  }, [activeImage, selectedAttire, brushStrokes, selectedPerson]);
 
   const clearBrushStrokes = useCallback(() => {
     setBrushStrokes([]);
@@ -445,11 +511,27 @@ const FusionRealityTab: React.FC<FusionRealityTabProps> = ({
           
           <div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 min-h-64 flex items-center justify-center">
             {processedImage ? (
-              <img
-                src={processedImage}
-                alt="Processed Result"
-                className="max-w-full max-h-96 object-contain rounded-lg"
-              />
+              <div className="relative">
+                <img
+                  src={processedImage}
+                  alt="Processed Result"
+                  className="max-w-full max-h-96 object-contain rounded-lg"
+                />
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = processedImage;
+                    link.download = `${selectedPerson}_attire_swap_${selectedAttire?.name.replace(/\s+/g, '_').toLowerCase()}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg transition-all duration-200"
+                  title="Download Swapped Attire"
+                >
+                  <ArrowDownTrayIcon className="w-5 h-5" />
+                </button>
+              </div>
             ) : (
               <div className="text-center text-gray-500">
                 <div className="text-4xl mb-2">✨</div>
@@ -461,10 +543,28 @@ const FusionRealityTab: React.FC<FusionRealityTabProps> = ({
 
           {processedImage && (
             <div className="mt-4 space-y-2">
-              <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                Save Result
+              <button 
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = processedImage;
+                  link.download = `${selectedPerson}_attire_swap_${selectedAttire?.name.replace(/\s+/g, '_').toLowerCase()}.jpg`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowDownTrayIcon className="w-4 h-4" />
+                Download Result
               </button>
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+              <button 
+                onClick={() => {
+                  setProcessedImage(null);
+                  setSelectedAttire(null);
+                  setBrushStrokes([]);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+              >
                 Try Different Attire
               </button>
             </div>

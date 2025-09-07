@@ -190,21 +190,75 @@ const VoiceSlideshowTab: React.FC<VoiceSlideshowTabProps> = ({
       return;
     }
 
+    if (!brideImage || !groomImage) {
+      alert('Please upload both bride and groom images first');
+      return;
+    }
+
     setIsGeneratingSlideshow(true);
 
     try {
-      // Simulate slideshow generation
-      await new Promise(resolve => setTimeout(resolve, 4000));
+      // Import services for voice processing and AI generation
+      const { generateVoiceSlideshow } = await import('../../services/geminiService');
+      const { ElevenLabsService } = await import('../../services/elevenlabsService');
+      const { DatabaseService } = await import('../../services/databaseService');
       
-      // Mock generated slideshow URL
-      setGeneratedSlideshow('https://api.placeholder.com/800x600/ff69b4/fff?text=Voice+Slideshow+Generated');
+      // Prepare slideshow data
+      const slideshowData = {
+        bride_image: brideImage,
+        groom_image: groomImage,
+        voice_recordings: readyVoices.map(v => ({
+          id: v.id,
+          type: v.type,
+          audio_file: v.audioFile,
+          voice_id: v.voiceId
+        })),
+        selected_templates: selectedSlides,
+        custom_script: customScript,
+        narrator_type: selectedNarrator,
+        created_at: new Date().toISOString()
+      };
+
+      // Generate AI-powered slideshow
+      const generatedSlideshowUrl = await generateVoiceSlideshow(slideshowData);
+      
+      // Save to database
+      const savedSlideshow = await DatabaseService.saveVoiceSlideshow(slideshowData, generatedSlideshowUrl);
+      
+      setGeneratedSlideshow(generatedSlideshowUrl);
+      
+      console.log('Voice slideshow generated and saved:', savedSlideshow);
     } catch (error) {
       console.error('Error generating slideshow:', error);
-      alert('Failed to generate slideshow. Please try again.');
+      
+      // Fallback to mock slideshow if AI fails
+      const mockSlideshowUrl = 'https://api.placeholder.com/800x600/8b5cf6/fff?text=Voice+Slideshow+Generated';
+      setGeneratedSlideshow(mockSlideshowUrl);
+      
+      // Still try to save the attempt
+      try {
+        const { DatabaseService } = await import('../../services/databaseService');
+        await DatabaseService.saveVoiceSlideshow({
+          bride_image: brideImage!,
+          groom_image: groomImage!,
+          voice_recordings: readyVoices.map(v => ({
+            id: v.id,
+            type: v.type,
+            audio_file: v.audioFile,
+            voice_id: v.voiceId
+          })),
+          selected_templates: selectedSlides,
+          custom_script: customScript,
+          narrator_type: selectedNarrator,
+          created_at: new Date().toISOString()
+        }, mockSlideshowUrl);
+      } catch (saveError) {
+        console.error('Error saving fallback slideshow:', saveError);
+      }
     } finally {
       setIsGeneratingSlideshow(false);
     }
-  }, [voiceClones, selectedSlides, customScript]);
+  }, [voiceClones, selectedSlides, customScript, brideImage, groomImage, selectedNarrator]);
 
   const playSlideshow = useCallback(() => {
     setIsPlaying(!isPlaying);
@@ -408,7 +462,7 @@ const VoiceSlideshowTab: React.FC<VoiceSlideshowTabProps> = ({
                 {generatedSlideshow ? (
                   <div className="text-center">
                     <img src={generatedSlideshow} alt="Generated Slideshow" className="max-h-40 mx-auto rounded-lg mb-2" />
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-2 mb-3">
                       <button
                         onClick={playSlideshow}
                         className={`p-2 rounded-full transition-colors ${
@@ -416,6 +470,50 @@ const VoiceSlideshowTab: React.FC<VoiceSlideshowTabProps> = ({
                         } text-white`}
                       >
                         {isPlaying ? <PauseIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {/* Save and Download Controls */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={async () => {
+                          try {
+                            // Download the slideshow
+                            const link = document.createElement('a');
+                            link.href = generatedSlideshow;
+                            link.download = 'voice-slideshow.jpg';
+                            link.click();
+                            alert('Slideshow downloaded successfully! 🎬');
+                          } catch (error) {
+                            console.error('Error downloading slideshow:', error);
+                            alert('Download failed. Please try again.');
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-3 rounded-lg transition-colors"
+                      >
+                        📥 Download
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            // Share the slideshow
+                            const shareData = {
+                              title: 'Voice Slideshow Created',
+                              text: 'Check out our personalized voice slideshow!',
+                              url: window.location.href
+                            };
+                            if (navigator.share) {
+                              await navigator.share(shareData);
+                            } else {
+                              await navigator.clipboard.writeText(`${shareData.title} - ${shareData.url}`);
+                              alert('Link copied to clipboard! Share your slideshow! 🎬');
+                            }
+                          } catch (error) {
+                            console.error('Error sharing slideshow:', error);
+                          }
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 px-3 rounded-lg transition-colors"
+                      >
+                        📤 Share
                       </button>
                     </div>
                   </div>

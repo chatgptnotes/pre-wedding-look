@@ -186,16 +186,28 @@ const RegionalStylesTab: React.FC<RegionalStylesTabProps> = ({
 
     setIsGenerating(true);
     try {
-      // Simulate API call with regional style parameters
-      await new Promise(resolve => setTimeout(resolve, 4000));
+      // Import the AI generation service
+      const { generateRegionalStyleImages } = await import('../../services/geminiService');
       
-      // Mock generated images for the selected regional style
-      const mockImages = Array.from({ length: 6 }, (_, i) => 
-        `https://api.placeholder.com/800x600/${style.colors[0].replace('#', '')}/fff?text=${style.name}+${i + 1}`
+      // Generate multiple images with regional style variations
+      const generatedImages = await generateRegionalStyleImages(
+        style,
+        brideImage,
+        groomImage,
+        6 // Generate 6 variations
       );
-      setGeneratedImages(mockImages);
+      
+      setGeneratedImages(generatedImages);
     } catch (error) {
       console.error('Error generating regional style:', error);
+      
+      // Fallback to mock images if AI fails
+      const fallbackImages = Array.from({ length: 6 }, (_, i) => 
+        `https://api.placeholder.com/800x600/${style.colors[0].replace('#', '')}/fff?text=${style.name}+${i + 1}`
+      );
+      setGeneratedImages(fallbackImages);
+      
+      alert('AI generation failed. Showing preview images.');
     } finally {
       setIsGenerating(false);
     }

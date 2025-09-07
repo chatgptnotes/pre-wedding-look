@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { HeartIcon, CalendarIcon, UserGroupIcon } from '@heroicons/react/24/solid';
+import { HeartIcon, CalendarIcon, UserGroupIcon, ArrowDownTrayIcon } from '@heroicons/react/24/solid';
 import ImageUploader from '../ImageUploader';
+import { generateFutureVision } from '../../services/geminiService';
+import { GalleryService } from '../../services/galleryService';
 
 interface AgeScenario {
   id: string;
@@ -118,7 +120,7 @@ const FutureVisionTab: React.FC<FutureVisionTabProps> = ({
     setFamilyMembers(prev => prev.filter(member => member.id !== id));
   }, []);
 
-  const generateFutureVision = useCallback(async () => {
+  const generateFutureVisionImage = useCallback(async () => {
     if (!brideImage || !groomImage || !selectedScenario) {
       alert('Please upload both images and select a scenario');
       return;
@@ -127,19 +129,75 @@ const FutureVisionTab: React.FC<FutureVisionTabProps> = ({
     setIsGenerating(true);
     
     try {
-      // Simulate AI processing
-      await new Promise(resolve => setTimeout(resolve, 4000));
+      console.log('Generating future vision with AI for:', selectedScenario.name);
       
-      // Mock generated image - in real implementation, this would use AI aging/family generation
-      const scenarioName = selectedScenario.name.replace(/\s+/g, '+');
-      setGeneratedImage(`https://api.placeholder.com/800x600/ff69b4/fff?text=${scenarioName}+Vision`);
+      // Prepare scenario data for AI generation
+      const scenarioData = {
+        name: selectedScenario.name,
+        yearsAhead: selectedScenario.yearsAhead,
+        description: selectedScenario.description,
+        backgroundSetting: selectedBackground || undefined,
+        familyMembers: familyMembers.length > 0 ? familyMembers : undefined
+      };
+      
+      // Use the AI service to generate the future vision
+      const generatedImageUrl = await generateFutureVision(
+        scenarioData,
+        brideImage,
+        groomImage
+      );
+      
+      console.log('AI future vision generation completed successfully');
+      
+      // Save to Supabase database
+      try {
+        const imageBlob = await fetch(generatedImageUrl).then(r => r.blob());
+        const uploadResult = await GalleryService.uploadGeneratedImage(imageBlob, 'IN', 'bride', `future-vision-${selectedScenario.id}`);
+        
+        // Create GeneratedImage record in database
+        const generatedImageRecord = {
+          id: `future-vision-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          country_id: '1',
+          model_id: null,
+          style_id: null,
+          role: 'bride' as const,
+          image_url: uploadResult.url,
+          image_path: uploadResult.path,
+          thumbnail_url: uploadResult.url,
+          generation_params: {
+            scenario_name: selectedScenario.name,
+            years_ahead: selectedScenario.yearsAhead,
+            background_setting: selectedBackground,
+            family_members_count: familyMembers.length,
+            family_members: familyMembers,
+            generated_at: new Date().toISOString(),
+            type: 'future_vision'
+          },
+          quality_score: 0.9,
+          user_ratings: [],
+          view_count: 0,
+          is_featured: true, // Mark future visions as featured
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log('Saved future vision to database:', generatedImageRecord);
+        setGeneratedImage(generatedImageUrl);
+      } catch (dbError) {
+        console.error('Failed to save future vision to database:', dbError);
+        // Still show the generated image even if database save fails
+        setGeneratedImage(generatedImageUrl);
+      }
+      
     } catch (error) {
       console.error('Error generating future vision:', error);
-      alert('Failed to generate future vision. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to generate future vision: ${errorMessage}\n\nPlease try again with different scenario or images.`);
     } finally {
       setIsGenerating(false);
     }
-  }, [brideImage, groomImage, selectedScenario]);
+  }, [brideImage, groomImage, selectedScenario, selectedBackground, familyMembers]);
 
   const resetGeneration = useCallback(() => {
     setGeneratedImage(null);
@@ -344,11 +402,27 @@ const FutureVisionTab: React.FC<FutureVisionTabProps> = ({
           
           <div className="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 min-h-64 flex items-center justify-center mb-6">
             {generatedImage ? (
-              <img
-                src={generatedImage}
-                alt="Future Vision"
-                className="max-w-full max-h-64 object-contain rounded-lg"
-              />
+              <div className="relative">
+                <img
+                  src={generatedImage}
+                  alt="Future Vision"
+                  className="max-w-full max-h-64 object-contain rounded-lg"
+                />
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = generatedImage;
+                    link.download = `future_vision_${selectedScenario?.name.replace(/\s+/g, '_').toLowerCase()}_${selectedScenario?.yearsAhead}years.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg transition-all duration-200"
+                  title="Download Future Vision"
+                >
+                  <ArrowDownTrayIcon className="w-5 h-5" />
+                </button>
+              </div>
             ) : (
               <div className="text-center text-gray-500">
                 <div className="text-4xl mb-2">🔮</div>
@@ -376,7 +450,7 @@ const FutureVisionTab: React.FC<FutureVisionTabProps> = ({
 
           <div className="space-y-3">
             <button
-              onClick={generateFutureVision}
+              onClick={generateFutureVisionImage}
               disabled={!brideImage || !groomImage || !selectedScenario || isGenerating}
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
             >
@@ -401,8 +475,19 @@ const FutureVisionTab: React.FC<FutureVisionTabProps> = ({
                 >
                   Try Different Scenario
                 </button>
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                  Save & Share Vision
+                <button 
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = generatedImage;
+                    link.download = `future_vision_${selectedScenario?.name.replace(/\s+/g, '_').toLowerCase()}_${selectedScenario?.yearsAhead}years.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                  Download & Save Vision
                 </button>
               </>
             )}
