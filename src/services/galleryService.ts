@@ -34,15 +34,26 @@ export class GalleryService {
   // Check if Supabase is available
   private static checkSupabase() {
     const isAvailable = !!supabase;
-    console.log('Debug: checkSupabase() ->', isAvailable, 'supabase:', supabase);
-    console.log('Debug: Environment variables:', {
-      url: import.meta.env.VITE_SUPABASE_URL,
-      anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? '[SET]' : '[NOT SET]'
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    console.log('🔍 Debug: checkSupabase() ->', isAvailable);
+    console.log('🔍 Debug: Supabase object:', supabase);
+    console.log('🔍 Debug: Environment variables:', {
+      url: url || '[NOT SET]',
+      urlLength: url ? url.length : 0,
+      anonKey: anonKey ? '[SET - LENGTH: ' + anonKey.length + ']' : '[NOT SET]',
+      nodeEnv: import.meta.env.NODE_ENV,
+      mode: import.meta.env.MODE
     });
+    
     if (!supabase) {
-      console.warn('Supabase not configured. Using demo mode.');
+      console.warn('⚠️ Supabase not configured. Using demo mode.');
+      console.warn('⚠️ This means images will not be saved to the database!');
       return false;
     }
+    
+    console.log('✅ Supabase is available and ready for database operations');
     return true;
   }
 
@@ -200,7 +211,7 @@ export class GalleryService {
     };
     
     if (saveToDatabase && this.checkSupabase()) {
-      console.log('Debug: Saving model to Supabase database');
+      console.log('💾 Debug: Saving model to Supabase database');
       
       // Deactivate existing model for this country/role
       await supabase!

@@ -18,9 +18,17 @@ const CountryModelsManager: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [saving, setSaving] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     loadCountriesWithModels();
+    // Check if we're in demo mode
+    const checkDemoMode = () => {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      setIsDemoMode(!(url && anonKey));
+    };
+    checkDemoMode();
   }, []);
 
   const loadCountriesWithModels = async () => {
@@ -188,6 +196,21 @@ const CountryModelsManager: React.FC = () => {
       <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
         Country Models Manager
       </h2>
+
+      {/* Demo Mode Warning */}
+      {isDemoMode && (
+        <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-orange-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+            </svg>
+            <div>
+              <h4 className="font-semibold text-orange-800">Demo Mode Active</h4>
+              <p className="text-sm text-orange-700">Supabase database is not configured. Images are stored temporarily and will not persist between sessions.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Success/Error Messages */}
       {successMessage && (
