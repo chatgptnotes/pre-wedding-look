@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin, getSupabaseClient } from '../lib/supabase';
+import { getSupabaseClient } from '../lib/supabase';
 import type {
   Country,
   CountryModel,
@@ -6,100 +6,16 @@ import type {
   GeneratedImage,
   GenerationQueueItem,
   ModelRole,
-  StyleType,
-  GalleryFilters,
   ApplyStyleRequest,
   BatchGenerateRequest,
+  GalleryFilters,
   CountryWithModels
 } from '../types/gallery';
 
 export class GalleryService {
-  // In-memory storage for demo mode
-  private static demoModels: Map<string, CountryModel> = new Map();
-  private static demoGeneratedImages: Map<string, GeneratedImage> = new Map();
-  private static demoImageIdToKey: Map<string, string> = new Map();
-  
-  // Track created object URLs for cleanup
+  // Track created object URLs for cleanup (still needed for file uploads)
   private static objectUrls: Set<string> = new Set();
-  
-  // Helper to create demo model key
-  private static getDemoModelKey(countryId: string, role: ModelRole): string {
-    return `${countryId}-${role}`;
-  }
-  
-  // Helper to create demo generated image key
-  private static getDemoImageKey(countryId: string, styleId: string, role: ModelRole): string {
-    return `${countryId}-${styleId}-${role}`;
-  }
-  
-  // Helper to create demo queue item and generated image
-  private static async createDemoQueueItem(
-    country: Country, 
-    model: CountryModel, 
-    request: ApplyStyleRequest
-  ): Promise<GenerationQueueItem> {
-    console.log('Debug: Creating demo queue item with successful completion');
-    
-    const queueItem: GenerationQueueItem = {
-      id: `demo-queue-${Date.now()}`,
-      country_id: country.id,
-      model_id: model.id,
-      style_id: request.styleId,
-      role: request.role,
-      status: 'completed',
-      priority: request.priority || 0,
-      progress: 100,
-      variations: request.variations || 1,
-      error_message: null,
-      retry_count: 0,
-      created_by: null,
-      created_at: new Date().toISOString(),
-      started_at: new Date().toISOString(),
-      completed_at: new Date().toISOString()
-    };
-    
-    // Get the style details for display
-    const style = await this.getStyleById(request.styleId);
-    
-    // Create a demo generated image for this style application
-    const generatedImage: GeneratedImage = {
-      id: `demo-generated-${Date.now()}`,
-      country_id: country.id,
-      model_id: model.id,
-      style_id: request.styleId,
-      role: request.role,
-      image_url: model.source_image_url,
-      image_path: `demo/generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
-      thumbnail_url: model.source_image_url,
-      generation_params: {
-        style_applied: request.styleId,
-        generated_at: new Date().toISOString(),
-        demo_mode: true
-      },
-      quality_score: 0.85,
-      user_ratings: [],
-      view_count: 0,
-      is_featured: false,
-      is_saved: false,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      style_name: style?.name || `Applied Style ${request.styleId}`
-    };
-    
-    // Store the generated image in demo storage
-    const imageKey = this.getDemoImageKey(country.id, request.styleId, request.role);
-    this.demoGeneratedImages.set(generatedImage.id, generatedImage);
-    this.demoImageIdToKey.set(generatedImage.id, imageKey);
-    
-    console.log('Debug: Created demo generated image:', { imageId: generatedImage.id, imageKey, generatedImage });
-    
-    // Simulate a brief processing delay for realism
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return queueItem;
-  }
-  
+
   // Check database availability and get appropriate client
   private static checkSupabase(requireAdmin: boolean = false) {
     const client = getSupabaseClient(requireAdmin);
@@ -112,13 +28,13 @@ export class GalleryService {
     console.log('🔍 Debug: Environment variables:', {
       url: url || '[NOT SET]',
       urlLength: url ? url.length : 0,
-      anonKey: anonKey ? '[SET - LENGTH: ' + anonKey.length + ']' : '[NOT SET]',
-      serviceKey: serviceKey ? '[SET - LENGTH: ' + serviceKey.length + ']' : '[NOT SET]',
-      nodeEnv: import.meta.env.NODE_ENV,
-      mode: import.meta.env.MODE
+      anonKey: anonKey ? '[SET]' : '[NOT SET]',
+      anonKeyLength: anonKey ? anonKey.length : 0,
+      serviceKey: serviceKey ? '[SET]' : '[NOT SET]',
+      serviceKeyLength: serviceKey ? serviceKey.length : 0
     });
     
-    if (!client) {
+    if (!client || !url || !anonKey) {
       const errorMsg = requireAdmin 
         ? 'Admin database connection required. Please check your Supabase service key configuration.'
         : 'Database connection required. Please check your Supabase configuration.';
@@ -130,124 +46,29 @@ export class GalleryService {
     return client;
   }
 
-  // Check if Supabase is available for fallback logic
-  private static isSupabaseAvailable(): boolean {
-    try {
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      return !!(url && anonKey && supabase);
-    } catch {
-      return false;
-    }
-  }
-
   // ==================== Countries ====================
   
   static async getCountries(activeOnly = true): Promise<Country[]> {
     console.log('Debug: getCountries() called with activeOnly:', activeOnly);
     
-    if (!this.isSupabaseAvailable()) {
-      // Return demo countries
-      console.log('Debug: Using demo countries');
-      return [
-        {
-          id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
-          iso_code: 'IN',
-          name: 'India',
-          flag_emoji: '🇮🇳',
-          cultural_styles: ['indian', 'traditional'],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
-          iso_code: 'US',
-          name: 'United States',
-          flag_emoji: '🇺🇸',
-          cultural_styles: ['american', 'western'],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
+    const client = this.checkSupabase();
+    let query = client.from('countries').select('*');
+    
+    if (activeOnly) {
+      query = query.eq('is_active', true);
     }
-
-    try {
-      const client = this.checkSupabase();
-      let query = client.from('countries').select('*');
-      
-      if (activeOnly) {
-        query = query.eq('is_active', true);
-      }
-      
-      const { data, error } = await query.order('name');
-      
-      if (error) {
-        console.error('Error fetching countries from database:', error);
-        console.log('🔄 Falling back to demo countries due to database error');
-        // Fall back to demo countries on database error
-        return [
-          {
-            id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
-            iso_code: 'IN',
-            name: 'India',
-            flag_emoji: '🇮🇳',
-            cultural_styles: ['indian', 'traditional'],
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
-            iso_code: 'US',
-            name: 'United States',
-            flag_emoji: '🇺🇸',
-            cultural_styles: ['american', 'western'],
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-      }
-      
-      return data || [];
-    } catch (dbError) {
-      console.error('Database connection failed:', dbError);
-      console.log('🔄 Falling back to demo countries due to connection error');
-      // Fall back to demo countries on connection error
-      return [
-        {
-          id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
-          iso_code: 'IN',
-          name: 'India',
-          flag_emoji: '🇮🇳',
-          cultural_styles: ['indian', 'traditional'],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
-          iso_code: 'US',
-          name: 'United States',
-          flag_emoji: '🇺🇸',
-          cultural_styles: ['american', 'western'],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
+    
+    const { data, error } = await query.order('name');
+    
+    if (error) {
+      console.error('Error fetching countries from database:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
+    
+    return data || [];
   }
 
   static async getCountryByISO(iso: string): Promise<Country | null> {
-    if (!this.isSupabaseAvailable()) {
-      // Return demo country
-      const demoCountries = await this.getCountries();
-      return demoCountries.find(c => c.iso_code === iso) || null;
-    }
-
     const client = this.checkSupabase();
     const { data, error } = await client
       .from('countries')
@@ -257,7 +78,7 @@ export class GalleryService {
     
     if (error) {
       console.error('Error fetching country:', error);
-      return null;
+      throw new Error(`Database error: ${error.message}`);
     }
     
     return data;
@@ -268,294 +89,78 @@ export class GalleryService {
   static async getCountryModels(countryId: string): Promise<{ bride?: CountryModel; groom?: CountryModel }> {
     console.log('Debug: getCountryModels called for countryId:', countryId);
     
-    // Helper function to create and return demo models
-    const createDemoModels = () => {
-      console.log('Debug: Using demo models for countryId:', countryId);
-      const brideKey = this.getDemoModelKey(countryId, 'bride');
-      const groomKey = this.getDemoModelKey(countryId, 'groom');
-      
-      // Create default demo models for India if they don't exist
-      if (countryId === '1a2b3c4d-5e6f-7890-abcd-ef1234567890' && !this.demoModels.has(brideKey)) {
-        // Create default India bride model
-        const defaultBrideModel: CountryModel = {
-          id: `demo-${countryId}-bride`,
-          country_id: countryId,
-          role: 'bride',
-          name: 'India Bride Model',
-          source_image_url: 'https://images.unsplash.com/photo-1594736797933-d0511ba2fe65?w=300&h=400&fit=crop&crop=face',
-          source_image_path: 'demo/countries/IN/bride/default.jpg',
-          source_image_sha256: 'demo-hash-india-bride',
-          thumbnail_url: 'https://images.unsplash.com/photo-1594736797933-d0511ba2fe65?w=150&h=200&fit=crop&crop=face',
-          metadata: {
-            description: 'Demo India bride model for style application testing'
-          },
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        this.demoModels.set(brideKey, defaultBrideModel);
-        console.log('Debug: Created default India bride model for demo');
-      }
-      
-      return {
-        bride: this.demoModels.get(brideKey),
-        groom: this.demoModels.get(groomKey)
-      };
-    };
+    const client = this.checkSupabase();
+    const { data, error } = await client
+      .from('country_models')
+      .select('*')
+      .eq('country_id', countryId)
+      .eq('is_active', true);
     
-    if (!this.isSupabaseAvailable()) {
-      // Return demo models when Supabase isn't available
-      return createDemoModels();
+    if (error) {
+      console.error('Error fetching country models from database:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
+    
+    const models = data || [];
+    const brideModel = models.find(m => m.role === 'bride');
+    const groomModel = models.find(m => m.role === 'groom');
 
-    try {
-      const client = this.checkSupabase();
-      const { data, error } = await client
-        .from('country_models')
-        .select('*')
-        .eq('country_id', countryId)
-        .eq('is_active', true);
-      
-      if (error) {
-        console.error('Error fetching country models from database:', error);
-        console.log('🔄 Falling back to demo models due to database error');
-        // Fall back to demo models on database error
-        return createDemoModels();
-      }
-      
-      const models = data || [];
-      const brideModel = models.find(m => m.role === 'bride');
-      const groomModel = models.find(m => m.role === 'groom');
-      
-      console.log('Debug: Retrieved models from database:', { 
-        brideModel: !!brideModel,
-        groomModel: !!groomModel,
-        totalModels: models.length
-      });
-      
-      return {
-        bride: brideModel,
-        groom: groomModel
-      };
-    } catch (dbError) {
-      console.error('Database connection failed for country models:', dbError);
-      console.log('🔄 Falling back to demo models due to connection error');
-      // Fall back to demo models on connection error
-      return createDemoModels();
-    }
+    console.log('Debug: Found models:', {
+      bride: !!brideModel,
+      groom: !!groomModel,
+      total: models.length
+    });
+    
+    return {
+      bride: brideModel,
+      groom: groomModel
+    };
   }
 
   static async getCountryModelByRole(iso: string, role: ModelRole): Promise<CountryModel | null> {
-    if (!this.isSupabaseAvailable()) {
-      const country = await this.getCountryByISO(iso);
-      if (!country) return null;
-      
-      const modelKey = this.getDemoModelKey(country.id, role);
-      return this.demoModels.get(modelKey) || null;
-    }
-
-    const client = this.checkSupabase();
-    const { data, error } = await client
-      .rpc('get_country_model', { 
-        p_country_iso: iso, 
-        p_role: role 
-      });
+    const country = await this.getCountryByISO(iso);
+    if (!country) return null;
     
-    if (error) {
-      console.error('Error fetching country model:', error);
-      return null;
-    }
-    
-    return data?.[0] || null;
+    const models = await this.getCountryModels(country.id);
+    return models[role] || null;
   }
 
-  static async createOrUpdateModel(
-    countryId: string,
-    role: ModelRole,
-    imageUrl: string,
-    imagePath: string,
-    sha256: string,
-    metadata?: any,
-    saveToDatabase = true
-  ): Promise<CountryModel> {
-    console.log('Debug: createOrUpdateModel called with:', { countryId, role, imageUrl, saveToDatabase });
+  static async createCountryModel(model: Omit<CountryModel, 'id' | 'created_at' | 'updated_at'>): Promise<CountryModel> {
+    const client = this.checkSupabase(true);
+    const { data, error } = await client
+      .from('country_models')
+      .insert(model)
+      .select()
+      .single();
     
-    // Validate that countryId is a valid UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(countryId)) {
-      console.error('❌ Invalid UUID format for countryId:', countryId);
-      throw new Error(`Invalid country ID format. Expected UUID, got: ${countryId}`);
+    if (error) {
+      console.error('Error creating country model:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
     
-    const model: CountryModel = {
-      id: saveToDatabase ? `${countryId}-${role}` : `demo-${countryId}-${role}`,
-      country_id: countryId,
-      role,
-      name: `${role.charAt(0).toUpperCase() + role.slice(1)} Model`,
-      source_image_url: imageUrl,
-      source_image_path: imagePath,
-      source_image_sha256: sha256,
-      thumbnail_url: imageUrl,
-      face_encoding: null,
-      metadata: metadata || {},
-      is_active: true,
-      created_by: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    return data;
+  }
+
+  static async updateCountryModel(id: string, updates: Partial<CountryModel>): Promise<CountryModel> {
+    const client = this.checkSupabase(true);
+    const { data, error } = await client
+      .from('country_models')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
     
-    if (!this.isSupabaseAvailable() || !saveToDatabase) {
-      console.log('🎨 Demo mode: Storing model in memory');
-      const modelKey = this.getDemoModelKey(countryId, role);
-      this.demoModels.set(modelKey, model);
-      return model;
+    if (error) {
+      console.error('Error updating country model:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
     
-    // Use admin client for database operations to bypass RLS
-    const adminClient = this.checkSupabase(true);
-    
-    console.log('💾 Debug: Saving model to Supabase database with admin client');
-    
-    try {
-      // Deactivate existing model for this country/role
-      const { error: deactivateError } = await adminClient
-        .from('country_models')
-        .update({ is_active: false })
-        .eq('country_id', countryId)
-        .eq('role', role);
-      
-      if (deactivateError) {
-        console.warn('⚠️ Warning deactivating existing models:', deactivateError);
-      }
-      
-      // Create new active model
-      const { data, error } = await adminClient
-        .from('country_models')
-        .insert({
-          country_id: countryId,
-          role,
-          source_image_url: imageUrl,
-          source_image_path: imagePath,
-          source_image_sha256: sha256,
-          metadata,
-          is_active: true,
-          created_by: null
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('❌ Error creating country model:', error);
-        console.error('❌ Full error details:', JSON.stringify(error, null, 2));
-        
-        // Provide more specific error messages
-        if (error.code === '22P02') {
-          throw new Error(`Invalid UUID format in data. Country ID: ${countryId}`);
-        } else if (error.code === '23505') {
-          throw new Error(`Model already exists for ${role} in this country`);
-        } else if (error.message?.includes('row-level security')) {
-          throw new Error('Authentication required for admin operations');
-        } else {
-          throw new Error(`Database error: ${error.message}`);
-        }
-      }
-      
-      console.log('✅ Debug: Model saved to Supabase:', data);
-      return data;
-      
-    } catch (dbError) {
-      console.error('❌ Database operation failed:', dbError);
-      throw dbError;
-    }
+    return data;
   }
 
   // ==================== Styles ====================
   
-  static async getStyles(filters?: {
-    type?: StyleType;
-    category?: string;
-    culturalTags?: string[];
-    activeOnly?: boolean;
-  }): Promise<Style[]> {
-    if (!this.isSupabaseAvailable()) {
-      // Return demo styles when Supabase isn't available
-      const demoStyles: Style[] = [
-        {
-          id: '1',
-          name: 'Red Lehenga',
-          type: 'attire',
-          category: 'bride',
-          prompt_template: {
-            positive: 'a stunning, intricately embroidered red lehenga',
-            negative: 'low quality, blurry',
-            params: { strength: 0.8 }
-          },
-          cultural_tags: ['indian', 'traditional', 'wedding'],
-          preview_url: null,
-          thumbnail_url: null,
-          asset_refs: [],
-          is_active: true,
-          sort_order: 1,
-          created_at: new Date().toISOString(),
-          created_by: null,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Classic Sherwani',
-          type: 'attire',
-          category: 'groom',
-          prompt_template: {
-            positive: 'a classic cream-colored sherwani with a turban',
-            negative: 'low quality, blurry',
-            params: { strength: 0.8 }
-          },
-          cultural_tags: ['indian', 'traditional', 'wedding'],
-          preview_url: null,
-          thumbnail_url: null,
-          asset_refs: [],
-          is_active: true,
-          sort_order: 2,
-          created_at: new Date().toISOString(),
-          created_by: null,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          name: 'Elegant Updo',
-          type: 'hairstyle',
-          category: 'bride',
-          prompt_template: {
-            positive: 'an elegant, intricate updo with some loose strands framing her face',
-            negative: 'messy hair, unkempt',
-            params: { strength: 0.7 }
-          },
-          cultural_tags: ['elegant', 'formal', 'wedding'],
-          preview_url: null,
-          thumbnail_url: null,
-          asset_refs: [],
-          is_active: true,
-          sort_order: 3,
-          created_at: new Date().toISOString(),
-          created_by: null,
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      // Apply filters if provided
-      let filteredStyles = demoStyles;
-      
-      if (filters?.type) {
-        filteredStyles = filteredStyles.filter(style => style.type === filters.type);
-      }
-      
-      if (filters?.category) {
-        filteredStyles = filteredStyles.filter(style => style.category === filters.category);
-      }
-      
-      return filteredStyles;
-    }
-
+  static async getStyles(filters?: { type?: string; category?: string; activeOnly?: boolean }): Promise<Style[]> {
     const client = this.checkSupabase();
     let query = client.from('styles').select('*');
     
@@ -567,30 +172,21 @@ export class GalleryService {
       query = query.eq('category', filters.category);
     }
     
-    if (filters?.culturalTags?.length) {
-      query = query.contains('cultural_tags', filters.culturalTags);
-    }
-    
     if (filters?.activeOnly !== false) {
       query = query.eq('is_active', true);
     }
     
-    const { data, error } = await query.order('sort_order').order('name');
+    const { data, error } = await query.order('sort_order');
     
     if (error) {
       console.error('Error fetching styles:', error);
-      throw error;
+      throw new Error(`Database error: ${error.message}`);
     }
     
     return data || [];
   }
 
   static async getStyleById(id: string): Promise<Style | null> {
-    if (!this.isSupabaseAvailable()) {
-      const styles = await this.getStyles();
-      return styles.find(s => s.id === id) || null;
-    }
-
     const client = this.checkSupabase();
     const { data, error } = await client
       .from('styles')
@@ -599,11 +195,154 @@ export class GalleryService {
       .single();
     
     if (error) {
-      console.error('Error fetching style:', error);
+      console.error('Error fetching style by ID:', error);
       return null;
     }
     
     return data;
+  }
+
+  static async createStyle(style: Omit<Style, 'id' | 'created_at' | 'updated_at'>): Promise<Style> {
+    const client = this.checkSupabase(true);
+    const { data, error } = await client
+      .from('styles')
+      .insert(style)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating style:', error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    
+    return data;
+  }
+
+  // ==================== Generation Queue ====================
+  
+  static async addToQueue(request: ApplyStyleRequest): Promise<GenerationQueueItem> {
+    console.log('Debug: addToQueue called with request:', request);
+    
+    // Get country and model info
+    const country = await this.getCountryByISO(request.countryISO);
+    if (!country) {
+      throw new Error(`Country not found: ${request.countryISO}`);
+    }
+    
+    const model = await this.getCountryModelByRole(request.countryISO, request.role);
+    if (!model) {
+      throw new Error(`${request.role} model not found for ${request.countryISO}`);
+    }
+    
+    console.log('Debug: Found country:', country);
+    console.log('Debug: Found model:', model);
+
+    const client = this.checkSupabase();
+    
+    // Add to generation queue
+    const { data: queueData, error: queueError } = await client
+      .from('generation_queue')
+      .insert({
+        country_id: country.id,
+        model_id: model.id,
+        style_id: request.styleId,
+        role: request.role,
+        status: 'pending',
+        priority: request.priority || 0,
+        variations: request.variations || 1,
+        created_by: (await client.auth.getUser()).data.user?.id
+      })
+      .select()
+      .single();
+    
+    if (queueError) {
+      console.error('Error adding to queue:', queueError);
+      throw new Error(`Queue error: ${queueError.message}`);
+    }
+
+    // For now, simulate immediate completion and create generated image
+    const style = await this.getStyleById(request.styleId);
+    const { data: generatedData, error: generatedError } = await client
+      .from('generated_images')
+      .insert({
+        country_id: country.id,
+        model_id: model.id,
+        style_id: request.styleId,
+        queue_id: queueData.id,
+        role: request.role,
+        image_url: model.source_image_url, // Use model image as placeholder for now
+        image_path: `generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
+        thumbnail_url: model.source_image_url,
+        generation_params: {
+          style_applied: request.styleId,
+          generated_at: new Date().toISOString(),
+          model_used: model.id
+        },
+        quality_score: 0.85,
+        style_name: style?.name || `Applied Style ${request.styleId}`,
+        is_active: true,
+        created_by: (await client.auth.getUser()).data.user?.id
+      })
+      .select()
+      .single();
+    
+    if (generatedError) {
+      console.error('Error creating generated image:', generatedError);
+    } else {
+      console.log('Debug: Created generated image in database:', generatedData);
+    }
+    
+    // Update queue status to completed
+    await client
+      .from('generation_queue')
+      .update({ 
+        status: 'completed', 
+        progress: 100, 
+        completed_at: new Date().toISOString() 
+      })
+      .eq('id', queueData.id);
+    
+    return {
+      ...queueData,
+      status: 'completed',
+      progress: 100,
+      completed_at: new Date().toISOString()
+    };
+  }
+
+  static async batchAddToQueue(request: BatchGenerateRequest): Promise<GenerationQueueItem[]> {
+    const items = await Promise.all(
+      request.styles.map(styleId => 
+        this.addToQueue({
+          countryISO: request.countryISO,
+          styleId,
+          role: request.role,
+          priority: request.priority
+        })
+      )
+    );
+    return items;
+  }
+
+  static async getQueueStatus(countryISO: string, role: ModelRole): Promise<GenerationQueueItem[]> {
+    const country = await this.getCountryByISO(countryISO);
+    if (!country) return [];
+    
+    const client = this.checkSupabase();
+    const { data, error } = await client
+      .from('generation_queue')
+      .select('*')
+      .eq('country_id', country.id)
+      .eq('role', role)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (error) {
+      console.error('Error fetching queue status:', error);
+      return [];
+    }
+    
+    return data || [];
   }
 
   // ==================== Generated Images ====================
@@ -611,44 +350,6 @@ export class GalleryService {
   static async getGeneratedImages(filters?: GalleryFilters): Promise<GeneratedImage[]> {
     console.log('Debug: getGeneratedImages called with filters:', filters);
     
-    if (!this.isSupabaseAvailable()) {
-      // Use demo mode when Supabase isn't available
-      console.log('Debug: Using demo mode for generated images');
-      
-      let images = Array.from(this.demoGeneratedImages.values());
-      
-      // Apply filters
-      if (filters?.country) {
-        const country = await this.getCountryByISO(filters.country);
-        if (country) {
-          images = images.filter(img => img.country_id === country.id);
-        }
-      }
-      
-      if (filters?.role) {
-        images = images.filter(img => img.role === filters.role);
-      }
-      
-      if (filters?.featured) {
-        images = images.filter(img => img.is_featured === true);
-      }
-      
-      // Sort by creation date (newest first)
-      images.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      // Limit results
-      images = images.slice(0, 50);
-      
-      console.log('Debug: Returning demo generated images:', {
-        total: images.length,
-        filters,
-        images: images.map(img => ({ id: img.id, style_id: img.style_id, role: img.role }))
-      });
-      
-      return images;
-    }
-
-    // Use Supabase when available
     const client = this.checkSupabase();
     let query = client.from('generated_images').select('*');
     
@@ -668,7 +369,7 @@ export class GalleryService {
       query = query.eq('is_featured', true);
     }
     
-    // Always get active images
+    // Always filter active images
     query = query.eq('is_active', true);
     
     const { data, error } = await query
@@ -677,493 +378,128 @@ export class GalleryService {
     
     if (error) {
       console.error('Error fetching generated images:', error);
-      return [];
+      throw new Error(`Database error: ${error.message}`);
     }
     
-    const images = data || [];
-    console.log('Debug: Returning database generated images:', {
-      total: images.length,
-      filters,
-      images: images.map(img => ({ id: img.id, style_id: img.style_id, role: img.role }))
+    console.log('Debug: Returning generated images:', {
+      total: (data || []).length,
+      filters
     });
-    
-    return images;
-  }
-
-  static async getFeaturedImages(limit = 20): Promise<GeneratedImage[]> {
-    if (!this.isSupabaseAvailable()) {
-      // Return empty array for demo mode
-      return [];
-    }
-
-    const client = this.checkSupabase();
-    const { data, error } = await client
-      .rpc('get_featured_gallery', { p_limit: limit });
-    
-    if (error) {
-      console.error('Error fetching featured images:', error);
-      throw error;
-    }
     
     return data || [];
   }
 
-  static async incrementViewCount(imageId: string): Promise<void> {
-    if (!this.isSupabaseAvailable()) {
-      // Do nothing in demo mode
-      return;
-    }
-
-    const client = this.checkSupabase();
-    await client.rpc('increment', {
-      table_name: 'generated_images',
-      row_id: imageId,
-      column_name: 'view_count'
-    });
-  }
-
-  // ==================== Generation Queue ====================
-  
-  static async addToQueue(request: ApplyStyleRequest): Promise<GenerationQueueItem> {
-    console.log('Debug: addToQueue called with:', request);
-    
-    const country = await this.getCountryByISO(request.iso);
-    if (!country) {
-      console.error('Debug: Country not found for ISO:', request.iso);
-      throw new Error(`Country not found: ${request.iso}`);
-    }
-    
-    // Check if model exists for the requested role
-    const models = await this.getCountryModels(country.id);
-    const model = request.role === 'bride' ? models.bride : models.groom;
-    
-    if (!model) {
-      console.error(`Debug: No ${request.role} model found for country:`, country.name);
-      throw new Error(`No ${request.role} model available for ${country.name}. Please upload a model first.`);
-    }
-    
-    console.log('Debug: Found country:', country);
-    console.log('Debug: Found model:', model);
-    
-    if (!this.isSupabaseAvailable()) {
-      // Use demo mode when Supabase isn't available
-      return this.createDemoQueueItem(country, model, request);
-    }
-
-    // Use Supabase when available
-    console.log('Debug: Adding to Supabase generation queue');
-    
-    try {
-      const client = this.checkSupabase();
-      const { data: queueData, error: queueError } = await client
-        .from('generation_queue')
-        .insert({
-          country_id: country.id,
-          model_id: model.id,
-          style_id: request.styleId,
-          role: request.role,
-          status: 'pending',
-          priority: request.priority || 0,
-          variations: request.variations || 1,
-          created_by: (await client.auth.getUser()).data.user?.id
-        })
-        .select()
-        .single();
-      
-      if (queueError) {
-        console.error('Error adding to queue:', queueError);
-        console.log('🔄 Database operation failed, falling back to demo mode');
-        
-        // Fall back to demo mode when database operations fail
-        return this.createDemoQueueItem(country, model, request);
-      }
-      
-      // For now, simulate immediate completion and create generated image
-      const { data: generatedData, error: generatedError } = await client
-        .from('generated_images')
-        .insert({
-          country_id: country.id,
-          model_id: model.id,
-          style_id: request.styleId,
-          role: request.role,
-          image_url: model.source_image_url, // Use model image as placeholder
-          image_path: `generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
-          thumbnail_url: model.source_image_url,
-          generation_params: {
-            style_applied: request.styleId,
-            generated_at: new Date().toISOString(),
-            simulated: true
-          },
-          quality_score: 0.85,
-          is_active: true
-        })
-        .select()
-        .single();
-      
-      if (generatedError) {
-        console.error('Error creating generated image:', generatedError);
-      } else {
-        console.log('Debug: Created generated image in database:', generatedData);
-      }
-      
-      // Update queue status to completed
-      await this.updateQueueStatus(queueData.id, 'completed', 100);
-      
-      return {
-        ...queueData,
-        status: 'completed',
-        progress: 100,
-        completed_at: new Date().toISOString()
-      };
-      
-    } catch (dbError) {
-      console.error('Database connection or operation failed:', dbError);
-      console.log('🔄 Database error, falling back to demo mode');
-      
-      // Fall back to demo mode when database operations fail
-      return this.createDemoQueueItem(country, model, request);
-    }
-  }
-
-  static async batchAddToQueue(request: BatchGenerateRequest): Promise<GenerationQueueItem[]> {
-    const items = await Promise.all(
-      request.styleIds.map(styleId =>
-        this.addToQueue({
-          iso: request.iso,
-          role: request.role,
-          styleId,
-          priority: request.priority
-        })
-      )
-    );
-    
-    return items;
-  }
-
-  static async getQueueStatus(): Promise<GenerationQueueItem[]> {
-    if (!this.isSupabaseAvailable()) {
-      // Return empty array for demo mode
-      return [];
-    }
-
-    const client = this.checkSupabase();
-    const { data, error } = await client
-      .from('generation_queue')
-      .select(`
-        *,
-        country:countries(*),
-        style:styles(*),
-        model:country_models(*)
-      `)
-      .in('status', ['pending', 'processing'])
-      .order('priority', { ascending: false })
-      .order('created_at');
-    
-    if (error) {
-      console.error('Error fetching queue status:', error);
-      throw error;
-    }
-    
-    return data || [];
-  }
-
-  static async updateQueueStatus(
-    queueId: string,
-    status: GenerationQueueItem['status'],
-    progress?: number,
-    errorMessage?: string
-  ): Promise<void> {
-    if (!this.isSupabaseAvailable()) {
-      return;
-    }
-
-    const updates: any = { status, progress };
-    
-    if (status === 'processing' && !updates.started_at) {
-      updates.started_at = new Date().toISOString();
-    }
-    
-    if (status === 'completed' || status === 'failed') {
-      updates.completed_at = new Date().toISOString();
-    }
-    
-    if (errorMessage) {
-      updates.error_message = errorMessage;
-    }
+  static async saveGeneratedImage(imageId: string): Promise<void> {
+    console.log('Debug: saveGeneratedImage called for image:', imageId);
     
     const client = this.checkSupabase();
     const { error } = await client
-      .from('generation_queue')
-      .update(updates)
-      .eq('id', queueId);
+      .from('generated_images')
+      .update({ 
+        is_saved: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', imageId);
     
     if (error) {
-      console.error('Error updating queue status:', error);
-      throw error;
-    }
-  }
-
-  // ==================== Storage ====================
-  
-  static async uploadModelImage(
-    file: File,
-    iso: string,
-    role: ModelRole
-  ): Promise<{ url: string; path: string; sha256: string }> {
-    console.log('Debug: uploadModelImage called with:', { iso, role, fileName: file.name });
-    
-    if (!this.isSupabaseAvailable()) {
-      // In demo mode, create object URL for the file
-      console.log('🎨 Demo mode: Creating object URL for uploaded file');
-      const objectUrl = URL.createObjectURL(file);
-      this.objectUrls.add(objectUrl);
-      
-      // Generate a fake SHA256 hash for demo
-      const fakeHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      
-      return {
-        url: objectUrl,
-        path: `demo/countries/${iso}/${role}/source-${Date.now()}.jpg`,
-        sha256: fakeHash
-      };
+      console.error('Error saving generated image:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
     
-    // Use admin client for storage operations
-    const adminClient = this.checkSupabase(true);
-    
-    try {
-      // Generate SHA256 hash of file
-      const fileBuffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', fileBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      console.log('💾 Debug: Uploading to Supabase storage with admin client');
-      
-      // Upload to storage
-      const storagePath = `countries/${iso}/${role}/source-${Date.now()}.jpg`;
-      const { error: uploadError } = await adminClient.storage
-        .from('faces')
-        .upload(storagePath, file, {
-          contentType: file.type,
-          upsert: true
-        });
-      
-      if (uploadError) {
-        console.error('❌ Error uploading model image:', uploadError);
-        throw new Error(`Storage upload failed: ${uploadError.message}`);
-      }
-      
-      // Get public URL
-      const { data: { publicUrl } } = adminClient.storage
-        .from('faces')
-        .getPublicUrl(storagePath);
-      
-      console.log('✅ Debug: Uploaded to Supabase storage:', { publicUrl, storagePath, sha256 });
-      return {
-        url: publicUrl,
-        path: storagePath,
-        sha256
-      };
-      
-    } catch (storageError) {
-      console.error('❌ Storage operation failed:', storageError);
-      throw storageError;
-    }
+    console.log('Debug: Image saved successfully');
   }
 
-  // Clean up object URLs to prevent memory leaks
-  static cleanupObjectUrls(): void {
-    this.objectUrls.forEach(url => {
-      try {
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.warn('Failed to revoke object URL:', url, error);
-      }
-    });
-    this.objectUrls.clear();
-  }
-
-  static async uploadGeneratedImage(
-    imageBlob: Blob,
-    iso: string,
-    role: ModelRole,
-    styleId: string
-  ): Promise<{ url: string; path: string }> {
-    if (!this.isSupabaseAvailable()) {
-      // In demo mode, create object URL
-      const objectUrl = URL.createObjectURL(imageBlob);
-      this.objectUrls.add(objectUrl);
-      return {
-        url: objectUrl,
-        path: `demo/countries/${iso}/${role}/${styleId}/${Date.now()}.jpg`
-      };
-    }
+  static async deleteGeneratedImage(imageId: string): Promise<void> {
+    console.log('Debug: deleteGeneratedImage called for image:', imageId);
     
     const client = this.checkSupabase();
-    const path = `countries/${iso}/${role}/${styleId}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
+    const { error } = await client
+      .from('generated_images')
+      .delete()
+      .eq('id', imageId);
     
-    const { error: uploadError } = await client.storage
-      .from('galleries')
-      .upload(path, imageBlob, {
-        contentType: 'image/jpeg',
-        upsert: false
-      });
-    
-    if (uploadError) {
-      console.error('Error uploading generated image:', uploadError);
-      throw uploadError;
+    if (error) {
+      console.error('Error deleting generated image:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
     
-    const { data: { publicUrl } } = client.storage
-      .from('galleries')
-      .getPublicUrl(path);
-    
-    return {
-      url: publicUrl,
-      path
-    };
+    console.log('Debug: Image deleted successfully');
   }
 
-  // ==================== Combined Operations ====================
+  static async clearGeneratedImages(countryIso: string, role: ModelRole): Promise<void> {
+    console.log('Debug: clearGeneratedImages called for:', { countryIso, role });
+    
+    const country = await this.getCountryByISO(countryIso);
+    if (!country) return;
+    
+    const client = this.checkSupabase();
+    const { error } = await client
+      .from('generated_images')
+      .update({ is_active: false })
+      .eq('country_id', country.id)
+      .eq('role', role);
+    
+    if (error) {
+      console.error('Error clearing generated images:', error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    
+    console.log('Debug: Generated images cleared successfully');
+  }
+
+  // ==================== Countries with Models ====================
   
   static async getCountriesWithModels(): Promise<CountryWithModels[]> {
-    console.log('Debug: getCountriesWithModels() called');
+    console.log('Debug: getCountriesWithModels called');
     
-    try {
-      // Get countries
-      const countries = await this.getCountries();
-      console.log('Debug: Got countries from getCountries():', countries);
-      
-      // Map countries to include models
-      const countriesWithModels = await Promise.all(
-        countries.map(async (country) => {
-          let models: { bride?: CountryModel; groom?: CountryModel } = { bride: undefined, groom: undefined };
-          let imageCount = 0;
-          
-          try {
-            models = await this.getCountryModels(country.id);
-          } catch (modelError) {
-            console.warn(`Failed to get models for country ${country.name}:`, modelError);
-            // Continue with empty models
-          }
-          
-          // Get image count
-          try {
-            if (this.isSupabaseAvailable()) {
-              // Get image count from database
-              const client = this.checkSupabase();
-              const { count, error } = await client
-                .from('generated_images')
-                .select('*', { count: 'exact', head: true })
-                .eq('country_id', country.id)
-                .eq('is_active', true);
-              
-              if (!error) {
-                imageCount = count || 0;
-              } else {
-                console.warn('Database error getting image count:', error);
-                imageCount = 0;
-              }
-            } else {
-              // Count demo images
-              const demoImages = Array.from(this.demoGeneratedImages.values())
-                .filter(img => img.country_id === country.id);
-              imageCount = demoImages.length;
-            }
-          } catch (imageCountError) {
-            console.warn(`Failed to get image count for country ${country.name}:`, imageCountError);
-            imageCount = 0;
-          }
-          
-          return {
-            ...country,
-            models,
-            imageCount
-          };
-        })
-      );
-      
-      console.log('Debug: Returning countries with models:', countriesWithModels);
-      return countriesWithModels;
-      
-    } catch (error) {
-      console.error('Debug: Error in getCountriesWithModels():', error);
-      
-      // Enhanced fallback to demo data
-      console.log('🔄 Falling back to basic demo countries with models');
-      const demoCountries = [
-        {
-          id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
-          iso_code: 'IN',
-          name: 'India',
-          flag_emoji: '🇮🇳',
-          cultural_styles: ['indian', 'traditional'],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
-          iso_code: 'US',
-          name: 'United States',
-          flag_emoji: '🇺🇸',
-          cultural_styles: ['american', 'western'],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+    // Get all active countries
+    const countries = await this.getCountries(true);
+    
+    // Map countries to include models
+    const countriesWithModels = await Promise.all(
+      countries.map(async (country) => {
+        let models: { bride?: CountryModel; groom?: CountryModel } = { bride: undefined, groom: undefined };
+        let imageCount = 0;
+        
+        try {
+          models = await this.getCountryModels(country.id);
+        } catch (modelError) {
+          console.warn(`Failed to get models for country ${country.name}:`, modelError);
+          // Continue with empty models
         }
-      ];
-      
-      return demoCountries.map(country => ({
-        ...country,
-        models: {
-          bride: this.demoModels.get(this.getDemoModelKey(country.id, 'bride')),
-          groom: this.demoModels.get(this.getDemoModelKey(country.id, 'groom'))
-        },
-        imageCount: Array.from(this.demoGeneratedImages.values())
-          .filter(img => img.country_id === country.id).length
-      }));
-    }
+        
+        try {
+          const images = await this.getGeneratedImages({ country: country.iso_code });
+          imageCount = images.length;
+        } catch (imageError) {
+          console.warn(`Failed to get images for country ${country.name}:`, imageError);
+          // Continue with 0 count
+        }
+        
+        return {
+          ...country,
+          models,
+          imageCount
+        };
+      })
+    );
+    
+    console.log('Debug: Returning countries with models:', {
+      total: countriesWithModels.length,
+      countries: countriesWithModels.map(c => ({
+        name: c.name,
+        hasBride: !!c.models.bride,
+        hasGroom: !!c.models.groom,
+        imageCount: c.imageCount
+      }))
+    });
+    
+    return countriesWithModels;
   }
 
   // ==================== Real-time Subscriptions ====================
   
-  static subscribeToGalleryUpdates(
-    callback: (payload: any) => void
-  ) {
-    if (!this.isSupabaseAvailable()) {
-      // Return a mock subscription for demo mode
-      return {
-        unsubscribe: () => console.log('Demo mode: Unsubscribed from gallery updates')
-      };
-    }
-
-    const client = this.checkSupabase();
-    return client
-      .channel('gallery-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'generated_images'
-        },
-        callback
-      )
-      .subscribe();
-  }
-
-  static subscribeToQueueUpdates(
-    callback: (payload: any) => void
-  ) {
-    if (!this.isSupabaseAvailable()) {
-      // Return a mock subscription for demo mode
-      return {
-        unsubscribe: () => console.log('Demo mode: Unsubscribed from queue updates')
-      };
-    }
-
+  static subscribeToQueueUpdates(callback: (payload: any) => void) {
     const client = this.checkSupabase();
     return client
       .channel('queue-updates')
@@ -1179,160 +515,13 @@ export class GalleryService {
       .subscribe();
   }
 
-  // ==================== Generated Image Management ====================
+  // ==================== Cleanup ====================
   
-  static async saveGeneratedImage(imageId: string): Promise<void> {
-    console.log('Debug: saveGeneratedImage called for image:', imageId);
-    
-    if (!this.isSupabaseAvailable()) {
-      // In demo mode, just mark as saved in memory
-      const image = this.demoGeneratedImages.get(imageId);
-      if (image) {
-        (image as any).is_saved = true;
-        image.updated_at = new Date().toISOString();
-        console.log('Debug: Image marked as saved in demo mode');
-      } else {
-        throw new Error('Image not found in demo storage');
-      }
-      return;
-    }
-
-    const client = this.checkSupabase();
-    const { error } = await client
-      .from('generated_images')
-      .update({ 
-        is_saved: true,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', imageId);
-
-    if (error) {
-      console.error('Error saving image:', error);
-      throw error;
-    }
-
-    console.log('Debug: Image saved to database');
-  }
-
-  static async deleteGeneratedImage(imageId: string): Promise<void> {
-    console.log('Debug: deleteGeneratedImage called for image:', imageId);
-    
-    if (!this.isSupabaseAvailable()) {
-      // In demo mode, remove from memory
-      const image = this.demoGeneratedImages.get(imageId);
-      if (image && image.image_url) {
-        // Clean up object URL if it's a demo image
-        if (this.objectUrls.has(image.image_url)) {
-          URL.revokeObjectURL(image.image_url);
-          this.objectUrls.delete(image.image_url);
-        }
-      }
-      this.demoGeneratedImages.delete(imageId);
-      this.demoImageIdToKey.delete(imageId);
-      console.log('Debug: Image deleted from demo storage');
-      return;
-    }
-
-    const client = this.checkSupabase();
-    const { error } = await client
-      .from('generated_images')
-      .delete()
-      .eq('id', imageId);
-
-    if (error) {
-      console.error('Error deleting image:', error);
-      throw error;
-    }
-
-    console.log('Debug: Image deleted from database');
-  }
-
-  static async clearGeneratedImages(countryIso: string, role: ModelRole): Promise<void> {
-    console.log('Debug: clearGeneratedImages called for:', { countryIso, role });
-    
-    if (!this.isSupabaseAvailable()) {
-      // In demo mode, clear matching images from memory
-      const country = await this.getCountryByISO(countryIso);
-      if (!country) return;
-      
-      const keysToDelete: string[] = [];
-      this.demoGeneratedImages.forEach((image, imageId) => {
-        if (image.country_id === country.id && image.role === role) {
-          // Clean up object URL if it's a demo image
-          if (image.image_url && this.objectUrls.has(image.image_url)) {
-            URL.revokeObjectURL(image.image_url);
-            this.objectUrls.delete(image.image_url);
-          }
-          keysToDelete.push(imageId);
-        }
-      });
-      keysToDelete.forEach(imageId => {
-        this.demoGeneratedImages.delete(imageId);
-        this.demoImageIdToKey.delete(imageId);
-      });
-      console.log('Debug: Cleared', keysToDelete.length, 'images from demo storage');
-      return;
-    }
-
-    const client = this.checkSupabase();
-    const { error } = await client
-      .from('generated_images')
-      .delete()
-      .eq('country_iso', countryIso)
-      .eq('role', role);
-
-    if (error) {
-      console.error('Error clearing images:', error);
-      throw error;
-    }
-
-    console.log('Debug: Images cleared from database');
-  }
-
-  // ==================== Action Tracking ====================
-  
-  static async logStyleApplicationAction(
-    action: 'apply' | 'save' | 'delete' | 'clear',
-    countryIso: string,
-    role: ModelRole,
-    styleId?: string,
-    imageId?: string,
-    metadata?: any
-  ): Promise<void> {
-    console.log('Debug: logStyleApplicationAction called:', { action, countryIso, role, styleId, imageId });
-    
-    if (!this.isSupabaseAvailable()) {
-      // In demo mode, just log to console
-      console.log('Demo mode: Style application action logged:', {
-        action,
-        countryIso,
-        role,
-        styleId,
-        imageId,
-        metadata,
-        timestamp: new Date().toISOString()
-      });
-      return;
-    }
-
-    const client = this.checkSupabase();
-    const { error } = await client
-      .from('style_application_logs')
-      .insert({
-        action,
-        country_iso: countryIso,
-        role,
-        style_id: styleId,
-        image_id: imageId,
-        metadata,
-        created_at: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error('Error logging style application action:', error);
-      // Don't throw error for logging failures to avoid disrupting the main flow
-    } else {
-      console.log('Debug: Style application action logged to database');
-    }
+  static cleanup() {
+    // Clean up object URLs
+    this.objectUrls.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    this.objectUrls.clear();
   }
 }
