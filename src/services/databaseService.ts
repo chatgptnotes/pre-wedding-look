@@ -2,6 +2,11 @@ import { supabase, type PreWeddingProject, type GeneratedImage } from '../lib/su
 import { GenerationConfig } from '../types';
 
 export class DatabaseService {
+  // Check if demo mode should be used
+  private static isDemoMode(): boolean {
+    return !supabase;
+  }
+
   // Project Management
   static async createProject(
     projectName: string,
@@ -9,8 +14,25 @@ export class DatabaseService {
     brideName?: string,
     groomName?: string
   ): Promise<{ data: PreWeddingProject | null; error: any }> {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not initialized' } };
+    if (this.isDemoMode()) {
+      console.log('DatabaseService: Using demo mode for createProject');
+      // Return a mock project in demo mode
+      const mockProject: PreWeddingProject = {
+        id: `demo-project-${Date.now()}`,
+        user_id: userId,
+        project_name: projectName,
+        bride_name: brideName || null,
+        groom_name: groomName || null,
+        bride_image_url: null,
+        groom_image_url: null,
+        generated_bride_image_url: null,
+        generated_groom_image_url: null,
+        final_image_url: null,
+        config: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      return { data: mockProject, error: null };
     }
     
     const { data, error } = await supabase

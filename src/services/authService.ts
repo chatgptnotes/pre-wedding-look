@@ -14,10 +14,20 @@ const AUTHORIZED_USERS: Record<string, UserRole> = {
 };
 
 export class AuthService {
+  // Check if we're in demo mode (same as App.tsx)
+  private static get isDemoMode(): boolean {
+    return true; // Set to false to re-enable authentication
+  }
+
   /**
    * Get user role based on email address
    */
   static getUserRole(user: User | null): UserRole {
+    // In demo mode, always return superadmin for testing
+    if (this.isDemoMode) {
+      return 'superadmin';
+    }
+
     if (!user?.email) {
       return 'user';
     }
@@ -29,6 +39,11 @@ export class AuthService {
    * Check if user has admin privileges
    */
   static isAdmin(user: User | null): boolean {
+    // In demo mode, always allow admin access
+    if (this.isDemoMode) {
+      return true;
+    }
+
     const role = this.getUserRole(user);
     return role === 'admin' || role === 'superadmin';
   }
@@ -37,6 +52,11 @@ export class AuthService {
    * Check if user has superadmin privileges
    */
   static isSuperAdmin(user: User | null): boolean {
+    // In demo mode, always allow superadmin access
+    if (this.isDemoMode) {
+      return true;
+    }
+
     const role = this.getUserRole(user);
     return role === 'superadmin';
   }
@@ -45,6 +65,11 @@ export class AuthService {
    * Check if user can access specific admin features
    */
   static canAccess(user: User | null, feature: AdminFeature): boolean {
+    // In demo mode, allow access to all features
+    if (this.isDemoMode) {
+      return true;
+    }
+
     const role = this.getUserRole(user);
     
     switch (feature) {
@@ -105,6 +130,11 @@ export class AuthService {
    * Validate superadmin access and throw error if unauthorized
    */
   static requireSuperAdmin(user: User | null): void {
+    // In demo mode, skip all validation
+    if (this.isDemoMode) {
+      return;
+    }
+
     if (!this.isSuperAdmin(user)) {
       throw new Error('Access denied. Super admin privileges required.');
     }

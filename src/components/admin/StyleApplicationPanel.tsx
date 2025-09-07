@@ -88,13 +88,17 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
       });
       
       // Show success toast
-      showToast('Style application queued successfully!', 'success');
+      showToast('Style applied successfully in demo mode!', 'success');
       
-      // Reload queue status
-      await loadQueueStatus();
+      // Reload queue status with a small delay to ensure state updates
+      setTimeout(async () => {
+        await loadQueueStatus();
+      }, 100);
+      
     } catch (error) {
       console.error('Error applying style:', error);
-      showToast('Failed to apply style', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to apply style';
+      showToast(errorMessage, 'error');
     } finally {
       setApplyingStyles(prev => {
         const newSet = new Set(prev);

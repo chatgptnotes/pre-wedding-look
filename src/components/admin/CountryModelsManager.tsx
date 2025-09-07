@@ -17,6 +17,7 @@ const CountryModelsManager: React.FC = () => {
   const loadCountriesWithModels = async () => {
     try {
       setLoading(true);
+      setErrorMessage(''); // Clear any previous errors
       console.log('Debug: Loading countries with models...');
       const data = await GalleryService.getCountriesWithModels();
       console.log('Debug: Loaded countries:', data);
@@ -93,8 +94,13 @@ const CountryModelsManager: React.FC = () => {
       console.log('Debug: Model created/updated successfully');
       setSuccessMessage(`Successfully uploaded ${role} model for ${country.name}`);
       
-      // Reload countries to show new model
-      await loadCountriesWithModels();
+      // Clear error messages on success
+      setErrorMessage('');
+      
+      // Reload countries to show new model with a small delay to ensure state updates
+      setTimeout(async () => {
+        await loadCountriesWithModels();
+      }, 100);
     } catch (error) {
       console.error('Error uploading model:', error);
       setErrorMessage(`Failed to upload ${role} model: ${error.message || 'Unknown error'}`);
@@ -263,10 +269,15 @@ const ModelUploadCard: React.FC<ModelUploadCardProps> = ({
             src={model.source_image_url}
             alt={`${country.name} ${role} model`}
             className="w-full h-48 object-cover rounded-lg"
+            onError={(e) => {
+              console.log('Image failed to load:', model.source_image_url);
+              e.currentTarget.style.display = 'none';
+            }}
           />
-          <p className="text-xs text-gray-500 mt-2">
-            Uploaded: {new Date(model.created_at).toLocaleDateString()}
-          </p>
+          <div className="mt-2 text-xs text-gray-500">
+            <p>Uploaded: {new Date(model.created_at).toLocaleDateString()}</p>
+            <p className="truncate">ID: {model.id}</p>
+          </div>
         </div>
       )}
 
