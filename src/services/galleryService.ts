@@ -16,6 +16,7 @@ import type {
 export class GalleryService {
   // In-memory storage for demo mode
   private static demoModels: Map<string, CountryModel> = new Map();
+  private static demoGeneratedImages: Map<string, GeneratedImage> = new Map();
   
   // Track created object URLs for cleanup
   private static objectUrls: Set<string> = new Set();
@@ -23,6 +24,11 @@ export class GalleryService {
   // Helper to create demo model key
   private static getDemoModelKey(countryId: string, role: ModelRole): string {
     return `${countryId}-${role}`;
+  }
+  
+  // Helper to create demo generated image key
+  private static getDemoImageKey(countryId: string, styleId: string, role: ModelRole): string {
+    return `${countryId}-${styleId}-${role}`;
   }
   
   // Check if Supabase is available
@@ -338,45 +344,42 @@ export class GalleryService {
   // ==================== Generated Images ====================
   
   static async getGeneratedImages(filters?: GalleryFilters): Promise<GeneratedImage[]> {
-    let query = supabase
-      .from('generated_images')
-      .select(`
-        *,
-        country:countries(*),
-        style:styles(*),
-        model:country_models(*)
-      `)
-      .eq('is_active', true);
+    console.log('Debug: getGeneratedImages called with filters:', filters);
     
+    // Always use demo mode for development
+    console.log('Debug: Using demo mode for generated images');
+    
+    let images = Array.from(this.demoGeneratedImages.values());
+    
+    // Apply filters
     if (filters?.country) {
       const country = await this.getCountryByISO(filters.country);
       if (country) {
-        query = query.eq('country_id', country.id);
+        images = images.filter(img => img.country_id === country.id);
       }
     }
     
     if (filters?.role) {
-      query = query.eq('role', filters.role);
-    }
-    
-    if (filters?.styleType) {
-      query = query.eq('style.type', filters.styleType);
+      images = images.filter(img => img.role === filters.role);
     }
     
     if (filters?.featured) {
-      query = query.eq('is_featured', true);
+      images = images.filter(img => img.is_featured === true);
     }
     
-    const { data, error } = await query
-      .order('created_at', { ascending: false })
-      .limit(50);
+    // Sort by creation date (newest first)
+    images.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     
-    if (error) {
-      console.error('Error fetching generated images:', error);
-      throw error;
-    }
+    // Limit results
+    images = images.slice(0, 50);
     
-    return data || [];
+    console.log('Debug: Returning generated images:', {
+      total: images.length,
+      filters,
+      images: images.map(img => ({ id: img.id, style_id: img.style_id, role: img.role }))
+    });
+    
+    return images;
   }
 
   static async getFeaturedImages(limit = 20): Promise<GeneratedImage[]> {
@@ -443,6 +446,36 @@ export class GalleryService {
     };
     
     console.log('Debug: Created demo queue item:', queueItem);
+    
+    // Create a demo generated image for this style application
+    const generatedImage: GeneratedImage = {
+      id: `demo-generated-${Date.now()}`,
+      country_id: country.id,
+      model_id: model.id,
+      style_id: request.styleId,
+      role: request.role,
+      image_url: model.source_image_url, // Use the original model image as demo result
+      image_path: `demo/generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
+      thumbnail_url: model.source_image_url,
+      generation_params: {
+        style_applied: request.styleId,
+        generated_at: new Date().toISOString(),
+        demo_mode: true
+      },
+      quality_score: 0.85,
+      user_ratings: [],
+      view_count: 0,
+      is_featured: false,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    // Store the generated image in demo storage
+    const imageKey = this.getDemoImageKey(country.id, request.styleId, request.role);
+    this.demoGeneratedImages.set(imageKey, generatedImage);
+    
+    console.log('Debug: Created demo generated image:', { imageKey, generatedImage });
     
     // Simulate a brief processing delay for realism
     await new Promise(resolve => setTimeout(resolve, 500));
