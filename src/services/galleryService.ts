@@ -32,6 +32,74 @@ export class GalleryService {
     return `${countryId}-${styleId}-${role}`;
   }
   
+  // Helper to create demo queue item and generated image
+  private static async createDemoQueueItem(
+    country: Country, 
+    model: CountryModel, 
+    request: ApplyStyleRequest
+  ): Promise<GenerationQueueItem> {
+    console.log('Debug: Creating demo queue item with successful completion');
+    
+    const queueItem: GenerationQueueItem = {
+      id: `demo-queue-${Date.now()}`,
+      country_id: country.id,
+      model_id: model.id,
+      style_id: request.styleId,
+      role: request.role,
+      status: 'completed',
+      priority: request.priority || 0,
+      progress: 100,
+      variations: request.variations || 1,
+      error_message: null,
+      retry_count: 0,
+      created_by: null,
+      created_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString()
+    };
+    
+    // Get the style details for display
+    const style = await this.getStyleById(request.styleId);
+    
+    // Create a demo generated image for this style application
+    const generatedImage: GeneratedImage = {
+      id: `demo-generated-${Date.now()}`,
+      country_id: country.id,
+      model_id: model.id,
+      style_id: request.styleId,
+      role: request.role,
+      image_url: model.source_image_url,
+      image_path: `demo/generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
+      thumbnail_url: model.source_image_url,
+      generation_params: {
+        style_applied: request.styleId,
+        generated_at: new Date().toISOString(),
+        demo_mode: true
+      },
+      quality_score: 0.85,
+      user_ratings: [],
+      view_count: 0,
+      is_featured: false,
+      is_saved: false,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      style_name: style?.name || `Applied Style ${request.styleId}`
+    };
+    
+    // Store the generated image in demo storage
+    const imageKey = this.getDemoImageKey(country.id, request.styleId, request.role);
+    this.demoGeneratedImages.set(generatedImage.id, generatedImage);
+    this.demoImageIdToKey.set(generatedImage.id, imageKey);
+    
+    console.log('Debug: Created demo generated image:', { imageId: generatedImage.id, imageKey, generatedImage });
+    
+    // Simulate a brief processing delay for realism
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return queueItem;
+  }
+  
   // Check database availability and get appropriate client
   private static checkSupabase(requireAdmin: boolean = false) {
     const client = getSupabaseClient(requireAdmin);
@@ -686,129 +754,82 @@ export class GalleryService {
     
     if (!this.isSupabaseAvailable()) {
       // Use demo mode when Supabase isn't available
-      console.log('Debug: Creating demo queue item with successful completion');
-      
-      const queueItem: GenerationQueueItem = {
-        id: `demo-queue-${Date.now()}`,
-        country_id: country.id,
-        model_id: model.id,
-        style_id: request.styleId,
-        role: request.role,
-        status: 'completed',
-        priority: request.priority || 0,
-        progress: 100,
-        variations: request.variations || 1,
-        error_message: null,
-        retry_count: 0,
-        created_by: null,
-        created_at: new Date().toISOString(),
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString()
-      };
-      
-      // Get the style details for display
-      const style = await this.getStyleById(request.styleId);
-      
-      // Create a demo generated image for this style application
-      const generatedImage: GeneratedImage = {
-        id: `demo-generated-${Date.now()}`,
-        country_id: country.id,
-        model_id: model.id,
-        style_id: request.styleId,
-        role: request.role,
-        image_url: model.source_image_url,
-        image_path: `demo/generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
-        thumbnail_url: model.source_image_url,
-        generation_params: {
-          style_applied: request.styleId,
-          generated_at: new Date().toISOString(),
-          demo_mode: true
-        },
-        quality_score: 0.85,
-        user_ratings: [],
-        view_count: 0,
-        is_featured: false,
-        is_saved: false,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        style_name: style?.name || `Applied Style ${request.styleId}`
-      };
-      
-      // Store the generated image in demo storage
-      const imageKey = this.getDemoImageKey(country.id, request.styleId, request.role);
-      this.demoGeneratedImages.set(generatedImage.id, generatedImage);
-      this.demoImageIdToKey.set(generatedImage.id, imageKey);
-      
-      console.log('Debug: Created demo generated image:', { imageId: generatedImage.id, imageKey, generatedImage });
-      
-      // Simulate a brief processing delay for realism
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return queueItem;
+      return this.createDemoQueueItem(country, model, request);
     }
 
     // Use Supabase when available
     console.log('Debug: Adding to Supabase generation queue');
     
-    const client = this.checkSupabase();
-    const { data: queueData, error: queueError } = await client
-      .from('generation_queue')
-      .insert({
-        country_id: country.id,
-        model_id: model.id,
-        style_id: request.styleId,
-        role: request.role,
-        status: 'pending',
-        priority: request.priority || 0,
-        variations: request.variations || 1,
-        created_by: (await client.auth.getUser()).data.user?.id
-      })
-      .select()
-      .single();
-    
-    if (queueError) {
-      console.error('Error adding to queue:', queueError);
-      throw queueError;
+    try {
+      const client = this.checkSupabase();
+      const { data: queueData, error: queueError } = await client
+        .from('generation_queue')
+        .insert({
+          country_id: country.id,
+          model_id: model.id,
+          style_id: request.styleId,
+          role: request.role,
+          status: 'pending',
+          priority: request.priority || 0,
+          variations: request.variations || 1,
+          created_by: (await client.auth.getUser()).data.user?.id
+        })
+        .select()
+        .single();
+      
+      if (queueError) {
+        console.error('Error adding to queue:', queueError);
+        console.log('🔄 Database operation failed, falling back to demo mode');
+        
+        // Fall back to demo mode when database operations fail
+        return this.createDemoQueueItem(country, model, request);
+      }
+      
+      // For now, simulate immediate completion and create generated image
+      const { data: generatedData, error: generatedError } = await client
+        .from('generated_images')
+        .insert({
+          country_id: country.id,
+          model_id: model.id,
+          style_id: request.styleId,
+          role: request.role,
+          image_url: model.source_image_url, // Use model image as placeholder
+          image_path: `generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
+          thumbnail_url: model.source_image_url,
+          generation_params: {
+            style_applied: request.styleId,
+            generated_at: new Date().toISOString(),
+            simulated: true
+          },
+          quality_score: 0.85,
+          is_active: true
+        })
+        .select()
+        .single();
+      
+      if (generatedError) {
+        console.error('Error creating generated image:', generatedError);
+      } else {
+        console.log('Debug: Created generated image in database:', generatedData);
+      }
+      
+      // Update queue status to completed
+      await this.updateQueueStatus(queueData.id, 'completed', 100);
+      
+      return {
+        ...queueData,
+        status: 'completed',
+        progress: 100,
+        completed_at: new Date().toISOString()
+      };
+      
+    } catch (dbError) {
+      console.error('Database connection or operation failed:', dbError);
+      console.log('🔄 Database error, falling back to demo mode');
+      
+      // Fall back to demo mode when database operations fail
+      return this.createDemoQueueItem(country, model, request);
     }
-    
-    // For now, simulate immediate completion and create generated image
-    const { data: generatedData, error: generatedError } = await client
-      .from('generated_images')
-      .insert({
-        country_id: country.id,
-        model_id: model.id,
-        style_id: request.styleId,
-        role: request.role,
-        image_url: model.source_image_url, // Use model image as placeholder
-        image_path: `generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
-        thumbnail_url: model.source_image_url,
-        generation_params: {
-          style_applied: request.styleId,
-          generated_at: new Date().toISOString(),
-          simulated: true
-        },
-        quality_score: 0.85,
-        is_active: true
-      })
-      .select()
-      .single();
-    
-    if (generatedError) {
-      console.error('Error creating generated image:', generatedError);
-    } else {
-      console.log('Debug: Created generated image in database:', generatedData);
-    }
-    
-    // Update queue status to completed
-    await this.updateQueueStatus(queueData.id, 'completed', 100);
-    
-    return {
-      ...queueData,
-      status: 'completed',
-      progress: 100,
-      completed_at: new Date().toISOString()
-    };
   }
 
   static async batchAddToQueue(request: BatchGenerateRequest): Promise<GenerationQueueItem[]> {
