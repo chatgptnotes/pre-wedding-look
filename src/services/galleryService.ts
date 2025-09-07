@@ -102,6 +102,14 @@ export class GalleryService {
   // ==================== Country Models ====================
   
   static async getCountryModels(countryId: string): Promise<{ bride?: CountryModel; groom?: CountryModel }> {
+    if (!this.checkSupabase()) {
+      // Return empty models for demo mode
+      return {
+        bride: undefined,
+        groom: undefined
+      };
+    }
+
     const { data, error } = await supabase
       .from('country_models')
       .select('*')
@@ -472,6 +480,11 @@ export class GalleryService {
   }
 
   static async getQueueStatus(): Promise<GenerationQueueItem[]> {
+    if (!this.checkSupabase()) {
+      // Return empty array for demo mode
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('generation_queue')
       .select(`
@@ -649,6 +662,13 @@ export class GalleryService {
   static subscribeToGalleryUpdates(
     callback: (payload: any) => void
   ) {
+    if (!this.checkSupabase()) {
+      // Return a mock subscription for demo mode
+      return {
+        unsubscribe: () => console.log('Demo mode: Unsubscribed from gallery updates')
+      };
+    }
+
     return supabase
       .channel('gallery-updates')
       .on(
@@ -666,6 +686,13 @@ export class GalleryService {
   static subscribeToQueueUpdates(
     callback: (payload: any) => void
   ) {
+    if (!this.checkSupabase()) {
+      // Return a mock subscription for demo mode
+      return {
+        unsubscribe: () => console.log('Demo mode: Unsubscribed from queue updates')
+      };
+    }
+
     return supabase
       .channel('queue-updates')
       .on(
