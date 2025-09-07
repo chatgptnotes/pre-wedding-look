@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { GalleryService } from '../../services/galleryService';
 import type { 
   Country, 
+  CountryWithModels,
   Style, 
   StyleType, 
   ModelRole,
-  GenerationQueueItem 
+  GenerationQueueItem,
+  GeneratedImage 
 } from '../../types/gallery';
 
 interface StyleApplicationPanelProps {

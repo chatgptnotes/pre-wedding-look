@@ -74,6 +74,7 @@ export interface GeneratedImage {
   user_ratings?: any[];
   view_count: number;
   is_featured: boolean;
+  is_saved?: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -81,6 +82,7 @@ export interface GeneratedImage {
   country?: Country;
   model?: CountryModel;
   style?: Style;
+  style_name?: string; // For convenience when style is not joined
 }
 
 export interface GenerationQueueItem {

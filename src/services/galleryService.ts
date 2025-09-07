@@ -104,21 +104,72 @@ export class GalleryService {
       ];
     }
 
-    const client = this.checkSupabase();
-    let query = client.from('countries').select('*');
-    
-    if (activeOnly) {
-      query = query.eq('is_active', true);
+    try {
+      const client = this.checkSupabase();
+      let query = client.from('countries').select('*');
+      
+      if (activeOnly) {
+        query = query.eq('is_active', true);
+      }
+      
+      const { data, error } = await query.order('name');
+      
+      if (error) {
+        console.error('Error fetching countries from database:', error);
+        console.log('🔄 Falling back to demo countries due to database error');
+        // Fall back to demo countries on database error
+        return [
+          {
+            id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
+            iso_code: 'IN',
+            name: 'India',
+            flag_emoji: '🇮🇳',
+            cultural_styles: ['indian', 'traditional'],
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
+            iso_code: 'US',
+            name: 'United States',
+            flag_emoji: '🇺🇸',
+            cultural_styles: ['american', 'western'],
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ];
+      }
+      
+      return data || [];
+    } catch (dbError) {
+      console.error('Database connection failed:', dbError);
+      console.log('🔄 Falling back to demo countries due to connection error');
+      // Fall back to demo countries on connection error
+      return [
+        {
+          id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
+          iso_code: 'IN',
+          name: 'India',
+          flag_emoji: '🇮🇳',
+          cultural_styles: ['indian', 'traditional'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
+          iso_code: 'US',
+          name: 'United States',
+          flag_emoji: '🇺🇸',
+          cultural_styles: ['american', 'western'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
     }
-    
-    const { data, error } = await query.order('name');
-    
-    if (error) {
-      console.error('Error fetching countries:', error);
-      throw error;
-    }
-    
-    return data || [];
   }
 
   static async getCountryByISO(iso: string): Promise<Country | null> {
@@ -154,38 +205,82 @@ export class GalleryService {
       const brideKey = this.getDemoModelKey(countryId, 'bride');
       const groomKey = this.getDemoModelKey(countryId, 'groom');
       
+      // Create default demo models for India if they don't exist
+      if (countryId === '1a2b3c4d-5e6f-7890-abcd-ef1234567890' && !this.demoModels.has(brideKey)) {
+        // Create default India bride model
+        const defaultBrideModel: CountryModel = {
+          id: `demo-${countryId}-bride`,
+          country_id: countryId,
+          role: 'bride',
+          name: 'India Bride Model',
+          source_image_url: 'https://images.unsplash.com/photo-1594736797933-d0511ba2fe65?w=300&h=400&fit=crop&crop=face',
+          source_image_path: 'demo/countries/IN/bride/default.jpg',
+          source_image_sha256: 'demo-hash-india-bride',
+          thumbnail_url: 'https://images.unsplash.com/photo-1594736797933-d0511ba2fe65?w=150&h=200&fit=crop&crop=face',
+          metadata: {
+            description: 'Demo India bride model for style application testing'
+          },
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        this.demoModels.set(brideKey, defaultBrideModel);
+        console.log('Debug: Created default India bride model for demo');
+      }
+      
       return {
         bride: this.demoModels.get(brideKey),
         groom: this.demoModels.get(groomKey)
       };
     }
 
-    const client = this.checkSupabase();
-    const { data, error } = await client
-      .from('country_models')
-      .select('*')
-      .eq('country_id', countryId)
-      .eq('is_active', true);
-    
-    if (error) {
-      console.error('Error fetching country models:', error);
-      return { bride: undefined, groom: undefined };
+    try {
+      const client = this.checkSupabase();
+      const { data, error } = await client
+        .from('country_models')
+        .select('*')
+        .eq('country_id', countryId)
+        .eq('is_active', true);
+      
+      if (error) {
+        console.error('Error fetching country models from database:', error);
+        console.log('🔄 Falling back to demo models due to database error');
+        // Fall back to demo models on database error
+        const brideKey = this.getDemoModelKey(countryId, 'bride');
+        const groomKey = this.getDemoModelKey(countryId, 'groom');
+        
+        return {
+          bride: this.demoModels.get(brideKey),
+          groom: this.demoModels.get(groomKey)
+        };
+      }
+      
+      const models = data || [];
+      const brideModel = models.find(m => m.role === 'bride');
+      const groomModel = models.find(m => m.role === 'groom');
+      
+      console.log('Debug: Retrieved models from database:', { 
+        brideModel: !!brideModel,
+        groomModel: !!groomModel,
+        totalModels: models.length
+      });
+      
+      return {
+        bride: brideModel,
+        groom: groomModel
+      };
+    } catch (dbError) {
+      console.error('Database connection failed for country models:', dbError);
+      console.log('🔄 Falling back to demo models due to connection error');
+      // Fall back to demo models on connection error
+      const brideKey = this.getDemoModelKey(countryId, 'bride');
+      const groomKey = this.getDemoModelKey(countryId, 'groom');
+      
+      return {
+        bride: this.demoModels.get(brideKey),
+        groom: this.demoModels.get(groomKey)
+      };
     }
-    
-    const models = data || [];
-    const brideModel = models.find(m => m.role === 'bride');
-    const groomModel = models.find(m => m.role === 'groom');
-    
-    console.log('Debug: Retrieved models from database:', { 
-      brideModel: !!brideModel,
-      groomModel: !!groomModel,
-      totalModels: models.length
-    });
-    
-    return {
-      bride: brideModel,
-      groom: groomModel
-    };
   }
 
   static async getCountryModelByRole(iso: string, role: ModelRole): Promise<CountryModel | null> {
@@ -610,6 +705,9 @@ export class GalleryService {
         completed_at: new Date().toISOString()
       };
       
+      // Get the style details for display
+      const style = await this.getStyleById(request.styleId);
+      
       // Create a demo generated image for this style application
       const generatedImage: GeneratedImage = {
         id: `demo-generated-${Date.now()}`,
@@ -629,9 +727,11 @@ export class GalleryService {
         user_ratings: [],
         view_count: 0,
         is_featured: false,
+        is_saved: false,
         is_active: true,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        style_name: style?.name || `Applied Style ${request.styleId}`
       };
       
       // Store the generated image in demo storage
@@ -922,12 +1022,20 @@ export class GalleryService {
       // Map countries to include models
       const countriesWithModels = await Promise.all(
         countries.map(async (country) => {
-          const models = await this.getCountryModels(country.id);
-          
+          let models = { bride: undefined, groom: undefined };
           let imageCount = 0;
-          if (this.isSupabaseAvailable()) {
-            // Get image count from database
-            try {
+          
+          try {
+            models = await this.getCountryModels(country.id);
+          } catch (modelError) {
+            console.warn(`Failed to get models for country ${country.name}:`, modelError);
+            // Continue with empty models
+          }
+          
+          // Get image count
+          try {
+            if (this.isSupabaseAvailable()) {
+              // Get image count from database
               const client = this.checkSupabase();
               const { count, error } = await client
                 .from('generated_images')
@@ -937,16 +1045,19 @@ export class GalleryService {
               
               if (!error) {
                 imageCount = count || 0;
+              } else {
+                console.warn('Database error getting image count:', error);
+                imageCount = 0;
               }
-            } catch (error) {
-              console.warn('Failed to get image count from database:', error);
-              imageCount = 0;
+            } else {
+              // Count demo images
+              const demoImages = Array.from(this.demoGeneratedImages.values())
+                .filter(img => img.country_id === country.id);
+              imageCount = demoImages.length;
             }
-          } else {
-            // Count demo images
-            const demoImages = Array.from(this.demoGeneratedImages.values())
-              .filter(img => img.country_id === country.id);
-            imageCount = demoImages.length;
+          } catch (imageCountError) {
+            console.warn(`Failed to get image count for country ${country.name}:`, imageCountError);
+            imageCount = 0;
           }
           
           return {
@@ -963,21 +1074,40 @@ export class GalleryService {
     } catch (error) {
       console.error('Debug: Error in getCountriesWithModels():', error);
       
-      // Fallback to basic data
-      try {
-        const countries = await this.getCountries();
-        return countries.map(country => ({
-          ...country,
-          models: {
-            bride: undefined,
-            groom: undefined
-          },
-          imageCount: 0
-        }));
-      } catch (fallbackError) {
-        console.error('Debug: Even fallback failed:', fallbackError);
-        return [];
-      }
+      // Enhanced fallback to demo data
+      console.log('🔄 Falling back to basic demo countries with models');
+      const demoCountries = [
+        {
+          id: '1a2b3c4d-5e6f-7890-abcd-ef1234567890',
+          iso_code: 'IN',
+          name: 'India',
+          flag_emoji: '🇮🇳',
+          cultural_styles: ['indian', 'traditional'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '2b3c4d5e-6f78-90ab-cdef-123456789012',
+          iso_code: 'US',
+          name: 'United States',
+          flag_emoji: '🇺🇸',
+          cultural_styles: ['american', 'western'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
+      
+      return demoCountries.map(country => ({
+        ...country,
+        models: {
+          bride: this.demoModels.get(this.getDemoModelKey(country.id, 'bride')),
+          groom: this.demoModels.get(this.getDemoModelKey(country.id, 'groom'))
+        },
+        imageCount: Array.from(this.demoGeneratedImages.values())
+          .filter(img => img.country_id === country.id).length
+      }));
     }
   }
 
