@@ -4,24 +4,41 @@ import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import LandingPage from './components/LandingPage';
 import Header from './components/Header';
+import TabNavigation, { TabId } from './components/TabNavigation';
 import OptionSelector from './components/OptionSelector';
 import ImageDisplay from './components/ImageDisplay';
 import ImageUploader from './components/ImageUploader';
 import MagicCreation from './components/MagicCreation';
+import FavoritesModal from './components/FavoritesModal';
+import ComparisonModal from './components/ComparisonModal';
+// New Tab Components
+import StoryboardTab from './components/tabs/StoryboardTab';
+import FusionRealityTab from './components/tabs/FusionRealityTab';
+import FutureVisionTab from './components/tabs/FutureVisionTab';
+import BananaChallengeTab from './components/tabs/BananaChallengeTab';
+import MagicButtonTab from './components/tabs/MagicButtonTab';
+import VoiceSlideshowTab from './components/tabs/VoiceSlideshowTab';
+import RegionalStylesTab from './components/tabs/RegionalStylesTab';
+import BeyondPreWeddingTab from './components/tabs/BeyondPreWeddingTab';
+import AdminPage from './components/AdminPage';
 import { generatePersonalizedImage } from './services/geminiService';
-import { GenerationConfig } from './types';
+import { GenerationConfig, ComparisonItem } from './types';
 import { LOCATIONS, BRIDE_ATTIRE, GROOM_ATTIRE, BRIDE_POSES, GROOM_POSES, STYLES, HAIRSTYLES, GROOM_HAIRSTYLES, ASPECT_RATIOS, JEWELRY } from './constants';
 import { DatabaseService } from './services/databaseService';
 import { PreWeddingProject } from './lib/supabase';
+import { AuthService } from './services/authService';
 
-type AppStage = 'landing' | 'bride' | 'groom' | 'couple';
+type AppStage = 'landing' | 'bride' | 'groom' | 'couple' | 'tabs' | 'admin';
 
 const AppContent: React.FC = () => {
   // Temporary bypass authentication for development
   const BYPASS_AUTH = true; // Set to false to re-enable authentication
   
+  // When bypassing auth, don't use auth loading state to prevent navigation loops
   const { loading: authLoading, user } = useAuth();
+  const loading = BYPASS_AUTH ? false : authLoading;
   const [stage, setStage] = useState<AppStage>('landing');
+  const [activeTab, setActiveTab] = useState<TabId>('classic');
   const [currentProject, setCurrentProject] = useState<PreWeddingProject | null>(null);
   
   // Original uploaded images
@@ -52,6 +69,11 @@ const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showMagicCreation, setShowMagicCreation] = useState<boolean>(false);
+  
+  // New feature states
+  const [showFavorites, setShowFavorites] = useState<boolean>(false);
+  const [showComparison, setShowComparison] = useState<boolean>(false);
+  const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
 
   const handleConfigChange = useCallback((key: keyof GenerationConfig, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -77,6 +99,8 @@ const AppContent: React.FC = () => {
       };
       const imageUrl = await generatePersonalizedImage(soloBrideConfig, originalBrideImage, null);
       setGeneratedBrideImage(imageUrl);
+      // Auto-add to comparison
+      addToComparison(imageUrl, 'bride');
     } catch (err) {
       if (err instanceof Error) setError(err.message);
       else setError("An unknown error occurred while generating the bride's image.");
@@ -105,6 +129,8 @@ const AppContent: React.FC = () => {
       };
       const imageUrl = await generatePersonalizedImage(soloGroomConfig, null, originalGroomImage);
       setGeneratedGroomImage(imageUrl);
+      // Auto-add to comparison
+      addToComparison(imageUrl, 'groom');
     } catch (err) {
       if (err instanceof Error) setError(err.message);
       else setError("An unknown error occurred while generating the groom's image.");
@@ -133,6 +159,8 @@ const AppContent: React.FC = () => {
       const imageUrl = await generatePersonalizedImage(coupleConfig, generatedBrideImage, generatedGroomImage);
       setFinalImage(imageUrl);
       setSelectedViewImage(null); // Clear selected view when new image is generated
+      // Auto-add to comparison
+      addToComparison(imageUrl, 'couple');
       // Stay on the 'couple' stage to allow for more edits
     } catch (err) {
       if (err instanceof Error) setError(err.message);
@@ -151,11 +179,24 @@ const AppContent: React.FC = () => {
     setFinalImage(null);
     setSelectedViewImage(null);
     setError(null);
+    setComparisonItems([]); // Clear comparison items when starting over
   };
 
+  // Add generated images to comparison
+  const addToComparison = useCallback((imageUrl: string, imageType: 'bride' | 'groom' | 'couple') => {
+    const newItem: ComparisonItem = {
+      id: Date.now().toString(),
+      imageUrl,
+      config,
+      imageType,
+      title: `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} Look - ${new Date().toLocaleTimeString()}`
+    };
+    setComparisonItems(prev => [...prev, newItem]);
+  }, [config]);
+
   const handleGetStarted = async () => {
-    // Set stage immediately to ensure UI progresses
-    setStage('bride');
+    // Set stage to tabs view instead of bride
+    setStage('tabs');
     
     // Create project in background without blocking the UI
     if (!BYPASS_AUTH && user) {
@@ -173,7 +214,9 @@ const AppContent: React.FC = () => {
             setTimeout(() => reject(new Error('Database operation timeout')), 3000)
           );
           
-          const { data: project, error } = await Promise.race([projectPromise, timeoutPromise]);
+          const result = await Promise.race([projectPromise, timeoutPromise]) as { data: any, error: any };
+          const { data: project, error } = result;
+          
           
           if (error) {
             console.error('Failed to create project:', error);
@@ -186,22 +229,239 @@ const AppContent: React.FC = () => {
       }, 0);
     }
   };
+
+  const handleExploreMode = useCallback((modeId: string) => {
+    // Convert feature IDs to tab IDs
+    const tabMapping: Record<string, TabId> = {
+      'classic': 'classic',
+      'storyboard': 'storyboard',
+      'fusion': 'fusion',
+      'future-vision': 'future-vision',
+      'banana-challenge': 'banana-challenge',
+      'voice-slideshow': 'voice-slideshow',
+      'magic-button': 'magic-button',
+      'regional-styles': 'regional-styles',
+      'beyond-pre-wedding': 'beyond-pre-wedding'
+    };
+    
+    const tabId = tabMapping[modeId] || 'classic';
+    setActiveTab(tabId);
+  }, []);
+
+  const handleImageUpload = useCallback((type: 'bride' | 'groom', image: string | null) => {
+    if (type === 'bride') {
+      setOriginalBrideImage(image);
+    } else {
+      setOriginalGroomImage(image);
+    }
+  }, []);
   
   const displayImageUrl = selectedViewImage || finalImage || generatedGroomImage || generatedBrideImage;
 
   // Show loading spinner while authentication is initializing (after all hooks)
-  if (!BYPASS_AUTH && authLoading) {
+  if (!BYPASS_AUTH && loading) {
     return <LoadingSpinner message="Initializing app..." />;
   }
 
   // Show landing page first
   if (stage === 'landing') {
-    return <LandingPage onGetStarted={handleGetStarted} />;
+    return <LandingPage onGetStarted={handleGetStarted} onExploreMode={handleExploreMode} />;
   }
 
+  // Show admin page
+  if (stage === 'admin') {
+    return <AdminPage onBack={() => setStage('tabs')} />;
+  }
+
+  // Show new tab-based interface
+  if (stage === 'tabs') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/40 relative overflow-hidden">
+        {/* Modern Floating Background Elements */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-40 right-20 w-48 h-48 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute bottom-20 left-1/2 w-56 h-56 bg-gradient-to-br from-pink-400/20 to-rose-400/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        </div>
+
+        <Header 
+          onShowFavorites={() => setShowFavorites(true)} 
+          onShowComparison={() => setShowComparison(true)} 
+        />
+        <main className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {/* Tab Navigation */}
+            <TabNavigation 
+              activeTab={activeTab} 
+              onTabChange={setActiveTab} 
+              className="sticky top-4 z-10" 
+            />
+
+            {/* Tab Content */}
+            <div className="min-h-screen relative">
+              {activeTab === 'classic' && (
+                <div className="bg-white/80 backdrop-blur-sm p-6 sm:p-8 rounded-3xl shadow-2xl border border-white/50">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent mb-2">
+                      💑 Classic Pre-Wedding Mode
+                    </h2>
+                    <p className="text-gray-600">Traditional step-by-step pre-wedding photo creation</p>
+                  </div>
+                  <button
+                    onClick={() => setStage('bride')}
+                    className="w-full bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold py-4 px-8 rounded-lg hover:from-rose-700 hover:to-pink-700 transition-all duration-300"
+                  >
+                    Start Classic Mode
+                  </button>
+                </div>
+              )}
+              
+              {activeTab === 'storyboard' && (
+                <StoryboardTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'fusion' && (
+                <FusionRealityTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'future-vision' && (
+                <FutureVisionTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'banana-challenge' && (
+                <BananaChallengeTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'voice-slideshow' && (
+                <VoiceSlideshowTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'magic-button' && (
+                <MagicButtonTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'regional-styles' && (
+                <RegionalStylesTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+              
+              {activeTab === 'beyond-pre-wedding' && (
+                <BeyondPreWeddingTab 
+                  brideImage={originalBrideImage}
+                  groomImage={originalGroomImage}
+                  onImageUpload={handleImageUpload}
+                />
+              )}
+            </div>
+          </div>
+        </main>
+        
+        {/* Floating Action Buttons - Improved positioning to prevent overlap */}
+        <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-50 max-w-[200px]">
+          {/* Admin Access Button (Admin users only) */}
+          {AuthService.isAdmin(user) && (
+            <div className="relative group">
+              <button
+                onClick={() => {
+                  try {
+                    AuthService.requireAdmin(user);
+                    setStage('admin');
+                  } catch (error) {
+                    alert('Access denied. Admin privileges required.');
+                  }
+                }}
+                className="group bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 backdrop-blur-sm border border-white/20 relative min-w-[60px] min-h-[60px] flex items-center justify-center"
+                title={`Admin Dashboard - ${AuthService.getUserDisplayInfo(user).roleLabel}`}
+              >
+                {/* Role indicator badge - repositioned to avoid overlap */}
+                <div className="absolute -top-2 -left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-2 py-1 rounded-xl shadow-lg whitespace-nowrap">
+                  {AuthService.isSuperAdmin(user) ? '👑 SUPER' : '⚡ ADMIN'}
+                </div>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              
+              {/* Tooltip on hover - positioned to avoid viewport overflow */}
+              <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-60">
+                Admin Dashboard
+                <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-slate-900"></div>
+              </div>
+            </div>
+          )}
+
+          {/* Home Button */}
+          <div className="relative group">
+            <button
+              onClick={() => setStage('landing')}
+              className="bg-white/90 backdrop-blur-xl text-slate-700 hover:text-indigo-600 p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-white/50 min-w-[60px] min-h-[60px] flex items-center justify-center"
+              title="Back to Home"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </button>
+            
+            {/* Tooltip on hover */}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-60">
+              Back to Home
+              <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-slate-900"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Modals */}
+        <FavoritesModal
+          isOpen={showFavorites}
+          onClose={() => setShowFavorites(false)}
+          onSelectImage={(imageUrl, config) => {
+            console.log('Selected favorite:', { imageUrl, config });
+          }}
+        />
+        <ComparisonModal
+          isOpen={showComparison}
+          onClose={() => setShowComparison(false)}
+          initialImages={comparisonItems}
+        />
+      </div>
+    );
+  }
+
+  // Classic mode (original implementation)
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50/50 via-pink-50/30 to-purple-50/50">
-      <Header />
+      <Header 
+        onShowFavorites={() => setShowFavorites(true)} 
+        onShowComparison={() => setShowComparison(true)} 
+      />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 sm:gap-8 max-w-7xl mx-auto">
           
@@ -234,16 +494,27 @@ const AppContent: React.FC = () => {
                     {stage === 'couple' && "Set the final romantic scene. Feel free to change options and regenerate as many times as you like!"}
                   </p>
                 </div>
-                <button 
-                    onClick={handleStartOver}
-                    className="bg-gradient-to-r from-gray-100 to-gray-200 hover:from-rose-100 hover:to-pink-100 text-gray-700 hover:text-rose-600 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
-                    </svg>
-                    Start Over
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                      onClick={() => setStage('tabs')}
+                      className="bg-gradient-to-r from-purple-100 to-pink-100 hover:from-purple-200 hover:to-pink-200 text-purple-700 hover:text-purple-800 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      New Features
+                  </button>
+                  <button 
+                      onClick={handleStartOver}
+                      className="bg-gradient-to-r from-gray-100 to-gray-200 hover:from-rose-100 hover:to-pink-100 text-gray-700 hover:text-rose-600 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
+                      </svg>
+                      Start Over
+                  </button>
+                </div>
             </div>
 
             {stage === 'bride' && (
@@ -377,18 +648,31 @@ const AppContent: React.FC = () => {
                     ) : '✨ Generate Scene'}
                   </button>
                   
-                  <button
-                    onClick={() => setShowMagicCreation(true)}
-                    disabled={!generatedBrideImage || !generatedGroomImage}
-                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg py-4 rounded-lg shadow-md hover:from-purple-700 hover:to-pink-700 transition-all duration-300 disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center"
-                    aria-label="Magic Creation"
-                  >
-                    <span className="text-2xl mr-2">🎨</span>
-                    Magic Creation
-                  </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setShowMagicCreation(true)}
+                      disabled={!generatedBrideImage || !generatedGroomImage}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg py-4 rounded-lg shadow-md hover:from-purple-700 hover:to-pink-700 transition-all duration-300 disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center"
+                      aria-label="Magic Creation"
+                    >
+                      <span className="text-2xl mr-2">🎨</span>
+                      Magic Creation
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowComparison(true)}
+                      disabled={comparisonItems.length === 0}
+                      className="bg-gradient-to-r from-blue-600 to-teal-600 text-white font-bold text-lg py-4 rounded-lg shadow-md hover:from-blue-700 hover:to-teal-700 transition-all duration-300 disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center"
+                      aria-label="Compare Looks"
+                    >
+                      <span className="text-2xl mr-2">🔍</span>
+                      Compare ({comparisonItems.length})
+                    </button>
+                  </div>
                   
                   <p className="text-center text-sm text-gray-600">
-                    Use <strong>Magic Creation</strong> for multiple poses & effects while preserving original faces!
+                    Use <strong>Magic Creation</strong> for multiple poses & effects while preserving original faces!<br/>
+                    <strong>Compare</strong> different looks side by side to pick your favorite!
                   </p>
                 </div>
               )}
@@ -426,6 +710,23 @@ const AppContent: React.FC = () => {
           onClose={() => setShowMagicCreation(false)} 
         />
       )}
+
+      {/* Favorites Modal */}
+      <FavoritesModal
+        isOpen={showFavorites}
+        onClose={() => setShowFavorites(false)}
+        onSelectImage={(imageUrl, config) => {
+          // Handle selecting an image from favorites (could load it into the main view)
+          console.log('Selected favorite:', { imageUrl, config });
+        }}
+      />
+
+      {/* Comparison Modal */}
+      <ComparisonModal
+        isOpen={showComparison}
+        onClose={() => setShowComparison(false)}
+        initialImages={comparisonItems}
+      />
     </div>
   );
 };

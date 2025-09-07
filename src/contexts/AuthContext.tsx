@@ -26,16 +26,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Check if we're in development mode with auth bypass
+  const isDevelopment = import.meta.env.DEV;
+  const bypassAuth = isDevelopment; // Can be configured
 
   useEffect(() => {
     let mounted = true;
+
+    // If in development with auth bypass, skip all auth logic
+    if (bypassAuth) {
+      console.log('Auth bypass enabled for development');
+      if (mounted) {
+        setLoading(false);
+        setUser(null);
+        setSession(null);
+      }
+      return () => {
+        mounted = false;
+      };
+    }
 
     // Get initial session
     const initializeAuth = async () => {
       try {
         if (!supabase) {
           console.warn('Supabase not initialized. Running without authentication.');
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+          }
           return;
         }
         
@@ -58,18 +77,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Add a fallback timeout to prevent infinite loading
+    // Reduce timeout to prevent navigation loops and add mounted check
     const fallbackTimeout = setTimeout(() => {
-      if (mounted) {
+      if (mounted && loading) {
         console.warn('Auth initialization taking too long, proceeding without auth');
         setLoading(false);
       }
-    }, 5000);
+    }, 2000); // Reduced from 5000 to 2000ms
 
     initializeAuth();
 
-    // Listen for auth changes
-    const subscription = supabase ? supabase.auth.onAuthStateChange(
+    // Listen for auth changes (only if auth is not bypassed)
+    const subscription = !bypassAuth && supabase ? supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
@@ -116,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    if (!supabase) {
+    if (!supabase || bypassAuth) {
       return { error: { message: 'Authentication not available in demo mode' } };
     }
     const { data, error } = await supabase.auth.signUp({
@@ -150,7 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    if (!supabase) {
+    if (!supabase || bypassAuth) {
       return { error: { message: 'Authentication not available in demo mode' } };
     }
     const { error } = await supabase.auth.signInWithPassword({
@@ -161,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    if (!supabase) {
+    if (!supabase || bypassAuth) {
       return { error: { message: 'Authentication not available in demo mode' } };
     }
     
@@ -177,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      if (supabase) {
+      if (supabase && !bypassAuth) {
         const { error } = await supabase.auth.signOut();
         if (error) {
           console.error('Supabase sign out error:', error);

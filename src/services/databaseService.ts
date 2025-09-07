@@ -151,4 +151,112 @@ export class DatabaseService {
 
     return { error };
   }
+
+  // Favorites Management
+  static async addToFavorites(
+    userId: string,
+    imageId: string,
+    imageUrl: string,
+    imageType: 'bride' | 'groom' | 'couple',
+    configUsed: GenerationConfig,
+    title?: string,
+    notes?: string
+  ): Promise<{ data: any; error: any }> {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not initialized' } };
+    }
+
+    const { data, error } = await supabase
+      .from('favorites')
+      .insert({
+        user_id: userId,
+        image_id: imageId,
+        image_url: imageUrl,
+        image_type: imageType,
+        config_used: configUsed,
+        title: title || null,
+        notes: notes || null,
+      })
+      .select()
+      .single();
+
+    return { data, error };
+  }
+
+  static async getFavorites(userId: string): Promise<{ data: any[] | null; error: any }> {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not initialized' } };
+    }
+
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    return { data, error };
+  }
+
+  static async removeFavorite(favoriteId: string): Promise<{ error: any }> {
+    if (!supabase) {
+      return { error: { message: 'Supabase not initialized' } };
+    }
+
+    const { error } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('id', favoriteId);
+
+    return { error };
+  }
+
+  // Analytics and Maintenance Functions
+  
+  // Refresh analytics materialized view
+  static async refreshAnalytics(): Promise<{ error: any }> {
+    if (!supabase) {
+      return { error: { message: 'Supabase not initialized' } };
+    }
+    
+    const { error } = await supabase.rpc('refresh_analytics');
+    return { error };
+  }
+
+  // Get analytics data
+  static async getAnalytics(limit: number = 30): Promise<{ data: any[] | null; error: any }> {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not initialized' } };
+    }
+    
+    const { data, error } = await supabase
+      .from('project_analytics')
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(limit);
+
+    return { data, error };
+  }
+
+  // Health check function
+  static async healthCheck(): Promise<{ healthy: boolean; error?: any }> {
+    if (!supabase) {
+      return { healthy: false, error: { message: 'Supabase not initialized' } };
+    }
+    
+    try {
+      // Test database connection with a simple query
+      const { error } = await supabase
+        .from('user_profiles')
+        .select('count')
+        .limit(1);
+      
+      if (error) {
+        return { healthy: false, error };
+      }
+      
+      return { healthy: true };
+    } catch (err: any) {
+      return { healthy: false, error: { message: err.message } };
+    }
+  }
 }

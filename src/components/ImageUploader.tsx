@@ -1,5 +1,6 @@
 import React, { useRef, ChangeEvent, useState } from 'react';
 import CameraCapture from './CameraCapture';
+import { useDragDrop } from '../hooks/useDragDrop';
 
 interface ImageUploaderProps {
   label: string;
@@ -15,13 +16,31 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ label, image, onImageChan
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onImageChange(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      processFile(file);
     }
   };
+
+  const processFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      onImageChange(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFilesDrop = (files: FileList) => {
+    const file = files[0]; // Take the first file since we only support single file upload
+    if (file) {
+      processFile(file);
+    }
+  };
+
+  const { isDragActive, isDragReject, ...dragHandlers } = useDragDrop({
+    onFilesDrop: handleFilesDrop,
+    accept: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    maxSize: 10 * 1024 * 1024, // 10MB
+    multiple: false
+  });
 
   const handleUploadClick = () => {
     inputRef.current?.click();
@@ -74,7 +93,14 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ label, image, onImageChan
         </div>
       ) : (
         <div
-          className="w-full h-48 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center p-4 space-y-2"
+          {...dragHandlers}
+          className={`w-full h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 space-y-2 transition-all duration-300 ${
+            isDragActive
+              ? isDragReject
+                ? 'border-red-400 bg-red-50 border-solid'
+                : 'border-green-400 bg-green-50 border-solid scale-105 shadow-lg'
+              : 'border-stone-300 hover:border-stone-400 hover:bg-stone-50'
+          }`}
         >
           <button
             onClick={handleUploadClick}
@@ -83,9 +109,20 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ label, image, onImageChan
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            <span className="text-stone-600 font-semibold ml-2">Upload from File</span>
+            <span className="text-stone-600 font-semibold ml-2">
+              {isDragActive 
+                ? (isDragReject ? 'Invalid file type or size' : 'Drop image here') 
+                : 'Upload from File'
+              }
+            </span>
           </button>
-          <div className="text-stone-400 text-sm">or</div>
+          {!isDragActive && (
+            <>
+              <div className="text-stone-400 text-sm">or drag & drop here</div>
+              <div className="text-stone-400 text-xs">Supports: JPG, PNG, WEBP (max 10MB)</div>
+            </>
+          )}
+          {!isDragActive && <div className="text-stone-400 text-sm">or</div>}
           <button
             onClick={() => setIsCameraOpen(true)}
             className="w-full flex items-center justify-center p-3 rounded-lg hover:bg-stone-100 transition-colors"

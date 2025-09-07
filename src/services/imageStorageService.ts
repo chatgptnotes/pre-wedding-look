@@ -55,11 +55,7 @@ export class ImageStorageService {
       // First, try to list buckets to check if images bucket exists (with timeout)
       console.log('Checking available buckets...');
       const bucketsPromise = supabase.storage.listBuckets();
-      const { data: buckets, error: bucketError } = await this.withTimeout(
-        bucketsPromise, 
-        5000, 
-        'List buckets'
-      );
+      const { data: buckets, error: bucketError } = await bucketsPromise;
       
       console.log('Available buckets:', buckets?.map(b => b.name) || 'none');
       
@@ -87,11 +83,7 @@ export class ImageStorageService {
             fileSizeLimit: 5242880 // 5MB
           });
           
-          const { data: createData, error: createError } = await this.withTimeout(
-            createBucketPromise,
-            10000,
-            'Create bucket'
-          );
+          const { data: createData, error: createError } = await createBucketPromise;
           
           if (createError) {
             console.error('❌ Failed to create bucket:', createError);
@@ -120,11 +112,7 @@ export class ImageStorageService {
           upsert: true // Allow overwrite if file exists
         });
 
-      const { data, error } = await this.withTimeout(
-        uploadPromise,
-        15000, // 15 seconds for upload
-        'File upload'
-      );
+      const { data, error } = await uploadPromise;
 
       if (error) {
         console.error('Upload error:', error);
@@ -138,11 +126,11 @@ export class ImageStorageService {
         .from('images')
         .getPublicUrl(data.path);
 
-      const { data: { publicUrl } } = await this.withTimeout(
-        publicUrlPromise,
-        3000,
-        'Get public URL'
-      );
+      const publicUrlResponse = supabase.storage
+        .from('images')
+        .getPublicUrl(data.path);
+      
+      const { data: { publicUrl } } = publicUrlResponse;
 
       console.log('Public URL generated:', publicUrl);
       return publicUrl;
@@ -190,11 +178,7 @@ export class ImageStorageService {
         .select()
         .single();
 
-      const { data, error } = await this.withTimeout(
-        insertPromise,
-        5000, // Reduced to 5 seconds
-        'Database save'
-      );
+      const { data, error } = await insertPromise;
 
       if (error) {
         console.error('Generated_images table error:', error);
@@ -243,7 +227,7 @@ export class ImageStorageService {
         .select()
         .single();
 
-      const { data, error } = await this.withTimeout(updatePromise, 5000, 'Project update');
+      const { data, error } = await updatePromise;
 
       if (error) {
         throw error;
@@ -324,11 +308,7 @@ export class ImageStorageService {
         return await this.uploadImageToStorage(imageBlob, fileName, userId);
       };
       
-      storageUrl = await this.withTimeout(
-        storageProcess(),
-        10000, // Reduced to 10 seconds
-        'Storage process'
-      );
+      storageUrl = await storageProcess();
       storagePath = `${userId}/${Date.now()}-${imageType}.jpg`;
       console.log('✅ Supabase storage successful:', storageUrl);
       
@@ -341,11 +321,7 @@ export class ImageStorageService {
     try {
       // Try database save with shorter timeout
       console.log('💾 Attempting database save...');
-      const savedImage = await this.withTimeout(
-        this.saveImageToDatabase(projectId, storageUrl, storagePath, imageType, config),
-        5000, // 5 seconds for database
-        'Database save'
-      );
+      const savedImage = await this.saveImageToDatabase(projectId, storageUrl, storagePath, imageType, config);
       console.log('✅ Database save successful:', savedImage);
       return savedImage;
       
@@ -368,15 +344,11 @@ export class ImageStorageService {
     // Try to get from Supabase first
     if (supabase) {
       try {
-        const { data, error } = await this.withTimeout(
-          supabase
+        const { data, error } = await supabase
             .from('generated_images')
             .select('*')
             .eq('project_id', projectId)
-            .order('created_at', { ascending: false }),
-          5000,
-          'Fetch images'
-        );
+            .order('created_at', { ascending: false });
         
         if (!error && data) {
           supabaseImages = data;
@@ -416,14 +388,10 @@ export class ImageStorageService {
     // Try Supabase first
     if (supabase) {
       try {
-        const { data, error } = await this.withTimeout(
-          supabase
+        const { data, error } = await supabase
             .from('generated_images')
             .select('*')
-            .order('created_at', { ascending: false }),
-          5000,
-          'Fetch all images'
-        );
+            .order('created_at', { ascending: false });
         
         if (!error && data) {
           supabaseImages = data;

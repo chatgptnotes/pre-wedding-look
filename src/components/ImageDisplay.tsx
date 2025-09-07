@@ -2,6 +2,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ImageStorageService } from '../services/imageStorageService';
+import { FavoritesService } from '../services/favoritesService';
+import SocialShare from './SocialShare';
+import { ShareableImage } from '../types';
 
 interface ImageDisplayProps {
   imageUrl: string | null;
@@ -46,6 +49,9 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [imageSaved, setImageSaved] = useState(isSaved);
+  const [addingToFavorites, setAddingToFavorites] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [showSocialShare, setShowSocialShare] = useState(false);
 
   const handleSave = async () => {
     if (!imageUrl || !user || imageSaved) {
@@ -119,6 +125,42 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   };
 
+  const handleAddToFavorites = async () => {
+    if (!imageUrl || !user || !config) return;
+    
+    setAddingToFavorites(true);
+    try {
+      const imageId = `${projectId || 'temp'}-${imageType}-${Date.now()}`;
+      const title = `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} Look`;
+      
+      const { error } = await FavoritesService.addToFavorites(
+        user.id,
+        imageId,
+        imageUrl,
+        imageType,
+        config,
+        title
+      );
+      
+      if (error) throw error;
+      
+      setIsFavorited(true);
+      alert('Added to favorites!');
+    } catch (error) {
+      console.error('Failed to add to favorites:', error);
+      alert('Failed to add to favorites. Please try again.');
+    } finally {
+      setAddingToFavorites(false);
+    }
+  };
+
+  const shareableImage: ShareableImage | null = imageUrl && config ? {
+    imageUrl,
+    title: `Beautiful ${imageType.charAt(0).toUpperCase() + imageType.slice(1)} Look`,
+    description: `Created with Pre-wedding Look AI - A stunning ${imageType} look for your special day!`,
+    config
+  } : null;
+
   return (
     <div className="w-full h-[30rem] md:h-full bg-stone-100 rounded-2xl shadow-inner flex items-center justify-center p-4">
       {isLoading ? (
@@ -134,6 +176,32 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           
           {/* Action buttons */}
           <div className="absolute bottom-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {/* Add to Favorites Button */}
+            {!isFavorited && (
+              <button
+                onClick={handleAddToFavorites}
+                disabled={addingToFavorites}
+                className="bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all duration-300 flex items-center"
+              >
+                {addingToFavorites ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    Favorite
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Save Button */}
             {!imageSaved ? (
               <button
@@ -192,10 +260,30 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                 )}
               </button>
             )}
+
+            {/* Share Button */}
+            <button
+              onClick={() => setShowSocialShare(true)}
+              className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all duration-300 flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+              </svg>
+              Share
+            </button>
           </div>
         </div>
       ) : (
         <InitialState />
+      )}
+
+      {/* Social Share Modal */}
+      {showSocialShare && shareableImage && (
+        <SocialShare
+          image={shareableImage}
+          isOpen={showSocialShare}
+          onClose={() => setShowSocialShare(false)}
+        />
       )}
     </div>
   );

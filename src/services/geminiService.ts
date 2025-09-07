@@ -22,6 +22,88 @@ const fileToGenerativePart = (data: string) => {
 };
 
 
+export async function generateStoryboardScene(
+  sceneConfig: {
+    name: string;
+    location: string;
+    timeOfDay: string;
+    description: string;
+  },
+  brideImage: string | null,
+  groomImage: string | null
+): Promise<string> {
+  const requestParts: ({ inlineData: { mimeType: string; data: string; } } | { text: string })[] = [];
+  let prompt = '';
+
+  const photographyDetails = `The final image should be a high-quality cinematic photograph with dramatic lighting appropriate for ${sceneConfig.timeOfDay}, professional composition, and film-like quality suitable for a romantic storyboard scene.`;
+
+  if (brideImage && groomImage) {
+    // Couple Storyboard Scene Logic
+    requestParts.push(fileToGenerativePart(brideImage), fileToGenerativePart(groomImage));
+
+    const promptParts = [
+      `**Task:** Create a cinematic pre-wedding storyboard scene combining the bride from the first image and the groom from the second image.`,
+      '',
+      '🚨 **ABSOLUTE CRITICAL FACE PRESERVATION RULES:** 🚨',
+      '1. **FACES MUST REMAIN 100% IDENTICAL:** The bride\'s face from image 1 and groom\'s face from image 2 must be copied EXACTLY as they appear.',
+      '2. **NO FACIAL MODIFICATIONS:** Do NOT change, enhance, stylize, or alter faces in any way.',
+      '3. **PRESERVE:** Face shape, skin tone, eyes, eyebrows, nose, lips, cheeks, chin, forehead, facial expressions.',
+      '4. **FACE CLARITY:** Maintain original face clarity and resolution - faces should be crystal clear.',
+      '5. **IDENTITY PRESERVATION:** The people must be instantly recognizable as the same individuals.',
+      '',
+      '**SCENE COMPOSITION (BODY & ENVIRONMENT ONLY):**',
+      `- **Scene Title:** ${sceneConfig.name}`,
+      `- **Location:** ${sceneConfig.location} - Create an authentic, detailed representation of this location`,
+      `- **Time of Day:** ${sceneConfig.timeOfDay} - Apply appropriate lighting, mood, and atmospheric effects`,
+      `- **Scene Description:** ${sceneConfig.description} - Capture this romantic moment while preserving faces`,
+      '- **Cinematic Quality:** Professional pre-wedding photography style with beautiful composition',
+      '- **Poses:** Natural, romantic poses appropriate for the scene and location',
+      `- **Photography:** ${photographyDetails}`,
+      '- **Aspect Ratio:** The image should be in 16:9 cinematic format for storyboard presentation',
+      '',
+      '**FINAL CHECK:** Before generating, ensure faces are 100% identical to source images with crystal-clear quality while creating a beautiful cinematic scene.'
+    ];
+    prompt = promptParts.filter(Boolean).join('\n');
+  } else {
+    throw new Error("Both bride and groom images are required for storyboard scene generation.");
+  }
+
+  requestParts.push({ text: prompt });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image-preview',
+      contents: {
+        parts: requestParts,
+      },
+      config: {
+        responseModalities: [Modality.IMAGE, Modality.TEXT],
+      },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        const base64ImageBytes = part.inlineData.data;
+        const mimeType = part.inlineData.mimeType;
+        return `data:${mimeType};base64,${base64ImageBytes}`;
+      }
+    }
+    
+    let responseText = "No storyboard scene was generated in the response.";
+    if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+        responseText = `Storyboard scene generation failed. Model response: ${response.candidates[0].content.parts[0].text}`;
+    }
+    throw new Error(responseText);
+
+  } catch (error) {
+    console.error("Error generating storyboard scene with Gemini:", error);
+    if (error instanceof Error && error.message.includes('Model response')) {
+        throw error;
+    }
+    throw new Error("Failed to generate the storyboard scene. The model may not have been able to process the request. Please try with different images or scene description.");
+  }
+}
+
 export async function generatePersonalizedImage(
   config: GenerationConfig,
   brideImage: string | null,

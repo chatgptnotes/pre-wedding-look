@@ -9,8 +9,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true,
-        providers: ['google']
+        detectSessionInUrl: true
       }
     })
   : null;
@@ -52,5 +51,17 @@ export interface GeneratedImage {
   image_type: 'bride' | 'groom' | 'couple';
   config_used: any; // JSON object
   is_downloaded?: boolean;
+  created_at: string;
+}
+
+export interface FavoriteItem {
+  id: string;
+  user_id: string;
+  image_id: string;
+  image_url: string;
+  image_type: 'bride' | 'groom' | 'couple';
+  config_used: any; // JSON object
+  title: string | null;
+  notes: string | null;
   created_at: string;
 }

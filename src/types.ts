@@ -46,3 +46,33 @@ interface ChatAction {
 }
 
 export type ChatbotAction = SetOptionAction | ChatAction;
+
+// Favorites/Wishlist types
+export interface FavoriteItem {
+  id: string;
+  user_id: string;
+  image_id: string;
+  image_url: string;
+  image_type: 'bride' | 'groom' | 'couple';
+  config_used: GenerationConfig;
+  title: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+// Comparison types
+export interface ComparisonItem {
+  id: string;
+  imageUrl: string;
+  config: GenerationConfig;
+  imageType: 'bride' | 'groom' | 'couple';
+  title?: string;
+}
+
+// Social sharing types
+export interface ShareableImage {
+  imageUrl: string;
+  title: string;
+  description?: string;
+  config: GenerationConfig;
+}
