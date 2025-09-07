@@ -19,6 +19,7 @@ const CountryModelsManager: React.FC = () => {
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [saving, setSaving] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [databaseError, setDatabaseError] = useState<string | null>(null);
 
   useEffect(() => {
     loadCountriesWithModels();
@@ -26,7 +27,8 @@ const CountryModelsManager: React.FC = () => {
     const checkDemoMode = () => {
       const url = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      setIsDemoMode(!(url && anonKey));
+      const forceDemoMode = import.meta.env.VITE_FORCE_DEMO_MODE === 'true';
+      setIsDemoMode(!(url && anonKey) || forceDemoMode);
     };
     checkDemoMode();
   }, []);
@@ -35,13 +37,23 @@ const CountryModelsManager: React.FC = () => {
     try {
       setLoading(true);
       setErrorMessage(''); // Clear any previous errors
+      setDatabaseError(null); // Clear database error
       console.log('Debug: Loading countries with models...');
       const data = await GalleryService.getCountriesWithModels();
       console.log('Debug: Loaded countries:', data);
       setCountries(data);
+      
+      // Check if we got demo data fallback (would indicate database issues)
+      if (data.length > 0 && data[0].id === '1a2b3c4d-5e6f-7890-abcd-ef1234567890') {
+        console.log('Debug: Detected demo data fallback, likely due to database issues');
+        setDatabaseError('Database connection issues detected. Using demo mode.');
+        setIsDemoMode(true);
+      }
     } catch (error) {
       console.error('Error loading countries:', error);
       setErrorMessage('Failed to load countries');
+      setDatabaseError(error.message || 'Unknown database error');
+      setIsDemoMode(true); // Force demo mode on error
     } finally {
       setLoading(false);
     }
@@ -205,7 +217,26 @@ const CountryModelsManager: React.FC = () => {
             </svg>
             <div>
               <h4 className="font-semibold text-orange-800">Demo Mode Active</h4>
-              <p className="text-sm text-orange-700">Supabase database is not configured. Images are stored temporarily and will not persist between sessions.</p>
+              <p className="text-sm text-orange-700">
+                {databaseError 
+                  ? `Database connection failed: ${databaseError}. Using demo mode.`
+                  : 'Supabase database is not configured. Images are stored temporarily and will not persist between sessions.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Database Error Warning (when not in demo mode but there are issues) */}
+      {!isDemoMode && databaseError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
+            </svg>
+            <div>
+              <h4 className="font-semibold text-red-800">Database Connection Issues</h4>
+              <p className="text-sm text-red-700">Error: {databaseError}</p>
             </div>
           </div>
         </div>

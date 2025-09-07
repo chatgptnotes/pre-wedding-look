@@ -17,6 +17,7 @@ export class GalleryService {
   // In-memory storage for demo mode
   private static demoModels: Map<string, CountryModel> = new Map();
   private static demoGeneratedImages: Map<string, GeneratedImage> = new Map();
+  private static demoImageIdToKey: Map<string, string> = new Map();
   
   // Track created object URLs for cleanup
   private static objectUrls: Set<string> = new Set();
@@ -736,9 +737,10 @@ export class GalleryService {
       
       // Store the generated image in demo storage
       const imageKey = this.getDemoImageKey(country.id, request.styleId, request.role);
-      this.demoGeneratedImages.set(imageKey, generatedImage);
+      this.demoGeneratedImages.set(generatedImage.id, generatedImage);
+      this.demoImageIdToKey.set(generatedImage.id, imageKey);
       
-      console.log('Debug: Created demo generated image:', { imageKey, generatedImage });
+      console.log('Debug: Created demo generated image:', { imageId: generatedImage.id, imageKey, generatedImage });
       
       // Simulate a brief processing delay for realism
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -1022,7 +1024,7 @@ export class GalleryService {
       // Map countries to include models
       const countriesWithModels = await Promise.all(
         countries.map(async (country) => {
-          let models = { bride: undefined, groom: undefined };
+          let models: { bride?: CountryModel; groom?: CountryModel } = { bride: undefined, groom: undefined };
           let imageCount = 0;
           
           try {
@@ -1212,6 +1214,7 @@ export class GalleryService {
         }
       }
       this.demoGeneratedImages.delete(imageId);
+      this.demoImageIdToKey.delete(imageId);
       console.log('Debug: Image deleted from demo storage');
       return;
     }
@@ -1235,18 +1238,24 @@ export class GalleryService {
     
     if (!this.isSupabaseAvailable()) {
       // In demo mode, clear matching images from memory
+      const country = await this.getCountryByISO(countryIso);
+      if (!country) return;
+      
       const keysToDelete: string[] = [];
-      this.demoGeneratedImages.forEach((image, key) => {
-        if ((image as any).country_iso === countryIso && image.role === role) {
+      this.demoGeneratedImages.forEach((image, imageId) => {
+        if (image.country_id === country.id && image.role === role) {
           // Clean up object URL if it's a demo image
           if (image.image_url && this.objectUrls.has(image.image_url)) {
             URL.revokeObjectURL(image.image_url);
             this.objectUrls.delete(image.image_url);
           }
-          keysToDelete.push(key);
+          keysToDelete.push(imageId);
         }
       });
-      keysToDelete.forEach(key => this.demoGeneratedImages.delete(key));
+      keysToDelete.forEach(imageId => {
+        this.demoGeneratedImages.delete(imageId);
+        this.demoImageIdToKey.delete(imageId);
+      });
       console.log('Debug: Cleared', keysToDelete.length, 'images from demo storage');
       return;
     }
