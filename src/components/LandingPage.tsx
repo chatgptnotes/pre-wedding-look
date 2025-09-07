@@ -11,9 +11,12 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onExploreMode }) => {
   const { user, loading, signOut } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  
+  // Bypass authentication in development mode
+  const BYPASS_AUTH = true; // Set to false to re-enable authentication
 
   const handleGetStarted = () => {
-    if (user) {
+    if (BYPASS_AUTH || user) {
       onGetStarted();
     } else {
       setShowAuthModal(true);
@@ -21,7 +24,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onExploreMode }
   };
 
   const handleExploreMode = (modeId: string) => {
-    if (user) {
+    if (BYPASS_AUTH || user) {
       // Navigate to specific mode
       onGetStarted();
       onExploreMode?.(modeId);

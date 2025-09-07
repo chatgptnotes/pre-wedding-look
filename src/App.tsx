@@ -20,6 +20,7 @@ import MagicButtonTab from './components/tabs/MagicButtonTab';
 import VoiceSlideshowTab from './components/tabs/VoiceSlideshowTab';
 import RegionalStylesTab from './components/tabs/RegionalStylesTab';
 import BeyondPreWeddingTab from './components/tabs/BeyondPreWeddingTab';
+import GalleryTab from './components/tabs/GalleryTab';
 import AdminPage from './components/AdminPage';
 import { generatePersonalizedImage } from './services/geminiService';
 import { GenerationConfig, ComparisonItem } from './types';
@@ -314,6 +315,10 @@ const AppContent: React.FC = () => {
                     Start Classic Mode
                   </button>
                 </div>
+              )}
+              
+              {activeTab === 'gallery' && (
+                <GalleryTab />
               )}
               
               {activeTab === 'storyboard' && (

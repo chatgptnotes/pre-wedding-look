@@ -36,6 +36,22 @@ describe('App Integration Tests', () => {
   const mockGeneratePersonalizedImage = generatePersonalizedImage as Mock;
   const mockCreateProject = DatabaseService.createProject as Mock;
   
+  const navigateToBrideStage = async () => {
+    const getStartedButton = screen.getByText(/Enter Creative Studio|Start Your Journey/i);
+    fireEvent.click(getStartedButton);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Start Classic Mode/i)).toBeInTheDocument();
+    });
+
+    const classicModeButton = screen.getByText(/Start Classic Mode/i);
+    fireEvent.click(classicModeButton);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
+    });
+  };
+  
   beforeEach(() => {
     vi.clearAllMocks();
     
@@ -58,19 +74,30 @@ describe('App Integration Tests', () => {
     it('should show landing page initially', () => {
       render(<App />);
       
-      expect(screen.getByText(/Get Started/i)).toBeInTheDocument();
-      expect(screen.getByText(/Create stunning pre-wedding photos/i)).toBeInTheDocument();
+      expect(screen.getByText(/Enter Creative Studio|Start Your Journey/i)).toBeInTheDocument();
+      expect(screen.getByText(/Next-Generation AI Photo Studio/i)).toBeInTheDocument();
+      expect(screen.getByText(/Create. Transform./i)).toBeInTheDocument();
     });
 
     it('should navigate to bride stage when get started is clicked', async () => {
       render(<App />);
       
-      const getStartedButton = screen.getByText(/Get Started/i);
+      // Click main get started button to enter tabs interface
+      const getStartedButton = screen.getByText(/Enter Creative Studio|Start Your Journey/i);
       fireEvent.click(getStartedButton);
       
       await waitFor(() => {
+        expect(screen.getByText(/Classic Pre-Wedding Mode/i)).toBeInTheDocument();
+        expect(screen.getByText(/Start Classic Mode/i)).toBeInTheDocument();
+      });
+
+      // Click the classic mode button to enter bride stage
+      const classicModeButton = screen.getByText(/Start Classic Mode/i);
+      fireEvent.click(classicModeButton);
+      
+      await waitFor(() => {
         expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-        expect(screen.getByText(/Upload a clear photo of the bride/i)).toBeInTheDocument();
+        expect(screen.getByText(/Upload Bride's Photo/i)).toBeInTheDocument();
       });
     });
   });
@@ -78,12 +105,7 @@ describe('App Integration Tests', () => {
   describe('Bride Stage Flow', () => {
     beforeEach(async () => {
       render(<App />);
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
     });
 
     it('should show bride upload and styling options', () => {
@@ -169,14 +191,7 @@ describe('App Integration Tests', () => {
   describe('Groom Stage Flow', () => {
     beforeEach(async () => {
       render(<App />);
-      
-      // Navigate through bride stage
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
 
       // Upload bride image and generate
       const brideFile = new File(['test'], 'bride.jpg', { type: 'image/jpeg' });
@@ -228,16 +243,9 @@ describe('App Integration Tests', () => {
   describe('Couple Stage Flow', () => {
     beforeEach(async () => {
       render(<App />);
-      
-      // Navigate through all stages
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      // Complete bride stage
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
 
+      // Complete bride stage
       const brideFile = new File(['test'], 'bride.jpg', { type: 'image/jpeg' });
       const brideFileInput = screen.getByLabelText(/Upload Bride's Photo/i);
       await userEvent.upload(brideFileInput, brideFile);
@@ -304,14 +312,7 @@ describe('App Integration Tests', () => {
       mockGeneratePersonalizedImage.mockRejectedValue(new Error('Generation failed'));
       
       render(<App />);
-      
-      // Navigate to bride stage
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
 
       // Upload image and try to generate
       const file = new File(['test'], 'bride.jpg', { type: 'image/jpeg' });
@@ -328,14 +329,7 @@ describe('App Integration Tests', () => {
 
     it('should show error when trying to generate without uploaded image', async () => {
       render(<App />);
-      
-      // Navigate to bride stage
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
 
       // Try to generate without uploading image - button should be disabled
       const styleBrideButton = screen.getByText(/Style Bride/i);
@@ -346,21 +340,14 @@ describe('App Integration Tests', () => {
   describe('Start Over Functionality', () => {
     it('should reset to landing page when start over is clicked', async () => {
       render(<App />);
-      
-      // Navigate to bride stage
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
 
       // Click start over
       const startOverButton = screen.getByText(/Start Over/i);
       fireEvent.click(startOverButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Get Started/i)).toBeInTheDocument();
+        expect(screen.getByText(/Enter Creative Studio|Start Your Journey/i)).toBeInTheDocument();
         expect(screen.queryByText(/Step 1: Style the Bride/i)).not.toBeInTheDocument();
       });
     });
@@ -369,14 +356,7 @@ describe('App Integration Tests', () => {
   describe('Configuration Changes', () => {
     it('should update configuration when option selectors are changed', async () => {
       render(<App />);
-      
-      // Navigate to bride stage
-      const getStartedButton = screen.getByText(/Get Started/i);
-      fireEvent.click(getStartedButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1: Style the Bride/i)).toBeInTheDocument();
-      });
+      await navigateToBrideStage();
 
       // Check for option selectors (this will depend on the actual OptionSelector implementation)
       expect(screen.getByText(/Bride's Attire/i)).toBeInTheDocument();

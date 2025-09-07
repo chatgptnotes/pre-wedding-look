@@ -7,8 +7,10 @@ import { useAuth } from '../contexts/AuthContext';
 import AIIntegrationDocumentation from './AIIntegrationDocumentation';
 import VideoDemoScript from './VideoDemoScript';
 import VisualEffectsLibrary from './VisualEffectsLibrary';
+import CountryModelsManager from './admin/CountryModelsManager';
+import StyleApplicationPanel from './admin/StyleApplicationPanel';
 
-type AdminSection = 'locations' | 'attire' | 'jewelry' | 'poses' | 'styles' | 'hairstyles' | 'regional-styles' | 'ai-integration' | 'video-demo' | 'visual-effects' | 'user-management' | 'system-settings' | 'analytics';
+type AdminSection = 'locations' | 'attire' | 'jewelry' | 'poses' | 'styles' | 'hairstyles' | 'regional-styles' | 'ai-integration' | 'video-demo' | 'visual-effects' | 'user-management' | 'system-settings' | 'analytics' | 'country-models' | 'style-application';
 
 interface AdminItem {
   id: string;
@@ -144,6 +146,23 @@ const ADMIN_SECTIONS = [
     color: 'from-green-600 to-emerald-700',
     description: 'View usage statistics, user analytics, and generate reports',
     requiredRole: 'superadmin' as const
+  },
+  // Gallery Management (New Features)
+  { 
+    id: 'country-models' as AdminSection, 
+    name: 'Country Models Manager', 
+    icon: <span className="text-sm">🌍</span>,
+    color: 'from-violet-500 to-purple-600',
+    description: 'Upload and manage model faces for different countries. One bride + one groom per country.',
+    requiredRole: 'admin' as const
+  },
+  { 
+    id: 'style-application' as AdminSection, 
+    name: 'Style Application System', 
+    icon: <span className="text-sm">🎨</span>,
+    color: 'from-rose-500 to-pink-600',
+    description: 'Apply styles to country models with one-click generation. Create gallery images.',
+    requiredRole: 'admin' as const
   }
 ];
 
@@ -465,6 +484,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
           case 'ai-integration':
           case 'video-demo':
           case 'visual-effects':
+          case 'country-models':
+          case 'style-application':
             return []; // Special cases - render custom components
           
           default:
@@ -704,6 +725,10 @@ const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
               <VideoDemoScript />
             ) : activeSection === 'visual-effects' ? (
               <VisualEffectsLibrary />
+            ) : activeSection === 'country-models' ? (
+              <CountryModelsManager />
+            ) : activeSection === 'style-application' ? (
+              <StyleApplicationPanel isAdmin={true} />
             ) : (
               <>
             {/* Section Header */}

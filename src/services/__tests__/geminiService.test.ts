@@ -1,21 +1,29 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generatePersonalizedImage } from '../geminiService';
 import { GenerationConfig } from '../../types';
 import { GoogleGenAI } from '@google/genai';
 
 // Mock the GoogleGenAI module
-const mockGenerateContent = vi.fn();
-vi.mock('@google/genai', () => ({
-  GoogleGenAI: vi.fn(() => ({
+vi.mock('@google/genai', () => {
+  const mockGenerateContent = vi.fn();
+  
+  const MockedGoogleGenAI = vi.fn().mockImplementation(() => ({
     models: {
       generateContent: mockGenerateContent
     }
-  })),
-  Modality: {
-    IMAGE: 'image',
-    TEXT: 'text'
-  }
-}));
+  }));
+
+  // Attach the mock to the constructor so we can access it later
+  MockedGoogleGenAI.mockGenerateContent = mockGenerateContent;
+
+  return {
+    GoogleGenAI: MockedGoogleGenAI,
+    Modality: {
+      IMAGE: 'image',
+      TEXT: 'text'
+    }
+  };
+});
 
 describe('geminiService', () => {
   const mockConfig: GenerationConfig = {
@@ -33,6 +41,10 @@ describe('geminiService', () => {
 
   const mockBrideImage = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/test';
   const mockGroomImage = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/test2';
+
+  // Get reference to the mock function
+  const MockedGoogleGenAI = GoogleGenAI as any;
+  const mockGenerateContent = MockedGoogleGenAI.mockGenerateContent;
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 
 export type TabId = 
   | 'classic' 
+  | 'gallery'
   | 'storyboard' 
   | 'fusion' 
   | 'future-vision' 
@@ -28,6 +29,14 @@ export const TABS: Tab[] = [
     icon: '💑',
     description: '📸 Perfect for beginners! Upload bride & groom photos → Choose traditional attire → Generate stunning romantic wedding scenes with AI magic',
     badge: 'Recommended'
+  },
+  {
+    id: 'gallery',
+    label: 'Gallery',
+    icon: '🖼️',
+    description: '🌍 Explore global wedding styles! Browse pre-generated images from 5 countries → See cultural authenticity → Get inspired before creating your own',
+    isNew: true,
+    badge: 'HOT!'
   },
   {
     id: 'storyboard',
