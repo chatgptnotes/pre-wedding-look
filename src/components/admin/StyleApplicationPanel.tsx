@@ -36,12 +36,20 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
     loadGeneratedImages();
     
     // Subscribe to queue updates
-    const subscription = GalleryService.subscribeToQueueUpdates(() => {
+    const queueSubscription = GalleryService.subscribeToQueueUpdates(() => {
+      console.log('Queue updated - refreshing queue status');
       loadQueueStatus();
+    });
+
+    // Subscribe to gallery updates (CRITICAL FIX)
+    const gallerySubscription = GalleryService.subscribeToGalleryUpdates(() => {
+      console.log('Gallery updated - refreshing generated images');
+      loadGeneratedImages();
     });
     
     return () => {
-      subscription.unsubscribe();
+      queueSubscription.unsubscribe();
+      gallerySubscription.unsubscribe();
     };
   }, []);
 
@@ -74,13 +82,17 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
 
   const loadGeneratedImages = async () => {
     try {
+      console.log('Loading generated images for:', { country: selectedCountry, role: selectedRole });
       const data = await GalleryService.getGeneratedImages({
         country: selectedCountry,
         role: selectedRole
       });
+      console.log('Successfully loaded generated images:', data.length);
       setGeneratedImages(data);
     } catch (error) {
       console.error('Error loading generated images:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load generated images';
+      showToast(errorMessage, 'error');
     }
   };
 
@@ -134,11 +146,14 @@ const StyleApplicationPanel: React.FC<StyleApplicationPanelProps> = ({ isAdmin }
       // Show success toast
       showToast('Style applied successfully in demo mode!', 'success');
       
-      // Reload queue status and generated images
+      // Reload queue status and generated images with improved timing
       setTimeout(async () => {
-        await loadQueueStatus();
-        await loadGeneratedImages();
-      }, 100);
+        console.log('Manual refresh after style application');
+        await Promise.all([
+          loadQueueStatus(),
+          loadGeneratedImages()
+        ]);
+      }, 500); // Increased timeout for better database consistency
       
     } catch (error) {
       console.error('Error applying style:', error);

@@ -302,8 +302,25 @@ export class GalleryService {
     
     if (generatedError) {
       console.error('Error creating generated image:', generatedError);
+      throw new Error(`Failed to create generated image: ${generatedError.message}`);
     } else {
       console.log('Debug: Created generated image in database:', generatedData);
+      
+      // Verify the image was created correctly
+      if (generatedData && generatedData.length > 0) {
+        const createdImage = generatedData[0];
+        console.log('Debug: Generated image details:', {
+          id: createdImage.id,
+          country_id: createdImage.country_id,
+          role: createdImage.role,
+          style_id: createdImage.style_id,
+          is_active: createdImage.is_active,
+          image_url: createdImage.image_url,
+          style_name: createdImage.style_name
+        });
+      } else {
+        console.warn('Warning: Generated image created but no data returned');
+      }
     }
     
     // Update queue status to completed
