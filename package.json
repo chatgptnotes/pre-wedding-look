@@ -16,7 +16,7 @@
     "@google/genai": "^1.16.0",
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
-    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/supabase-js": "^2.38.0",
     "@types/fabric": "^5.3.10",
     "fabric": "^6.7.1",
     "framer-motion": "^12.23.12",
