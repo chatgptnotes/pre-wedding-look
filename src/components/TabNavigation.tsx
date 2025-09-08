@@ -11,7 +11,8 @@ export type TabId =
   | 'voice-slideshow' 
   | 'magic-button' 
   | 'regional-styles' 
-  | 'beyond-pre-wedding';
+  | 'beyond-pre-wedding'
+  | 'blind-date';
 
 export interface Tab {
   id: TabId;
@@ -94,6 +95,14 @@ export const TABS: Tab[] = [
     icon: '🎯',
     description: '🎯 Expand your journey! Create anniversary shoots, maternity photos, destination weddings → Complete relationship timeline',
     isNew: true
+  },
+  {
+    id: 'blind-date',
+    label: 'Blind Date Style-Off',
+    icon: '🎭',
+    description: '🎭 Ultimate multiplayer fun! Style each other secretly in 3 timed rounds → Reveal results → React and share your hilarious outcomes!',
+    isNew: true,
+    badge: 'GAME!'
   }
 ];
 

@@ -21,6 +21,7 @@ import VoiceSlideshowTab from './components/tabs/VoiceSlideshowTab';
 import RegionalStylesTab from './components/tabs/RegionalStylesTab';
 import BeyondPreWeddingTab from './components/tabs/BeyondPreWeddingTab';
 import GalleryTab from './components/tabs/GalleryTab';
+import BlindDateTab from './components/tabs/BlindDateTab';
 import AdminPage from './components/AdminPage';
 import { generatePersonalizedImage } from './services/geminiService';
 import { GenerationConfig, ComparisonItem } from './types';
@@ -394,6 +395,10 @@ const AppContent: React.FC = () => {
                   groomImage={originalGroomImage}
                   onImageUpload={handleImageUpload}
                 />
+              )}
+
+              {activeTab === 'blind-date' && (
+                <BlindDateTab />
               )}
             </div>
           </div>

@@ -76,3 +76,84 @@ export interface ShareableImage {
   description?: string;
   config: GenerationConfig;
 }
+
+// Blind Date Style-Off Types
+export interface BlindDateSession {
+  id: string;
+  status: 'waiting' | 'active' | 'reveal' | 'finished';
+  is_private: boolean;
+  invite_code?: string;
+  created_at: string;
+  ended_at?: string;
+}
+
+export interface BlindDateParticipant {
+  session_id: string;
+  user_id: string;
+  role: 'A' | 'B';
+  joined_at: string;
+  is_revealed: boolean;
+  avatar_name: string;
+  is_me?: boolean;
+}
+
+export interface BlindDateRound {
+  id: string;
+  session_id: string;
+  round_no: number;
+  topic: 'attire' | 'hair' | 'location';
+  started_at: string;
+  ended_at?: string;
+  time_limit_seconds: number;
+}
+
+export interface BlindDateDesign {
+  id: string;
+  session_id: string;
+  round_id: string;
+  designer_user_id: string;
+  target_role: 'A' | 'B';
+  prompt: any;
+  image_url?: string;
+  created_at: string;
+}
+
+export interface BlindDateFeedback {
+  id: string;
+  session_id: string;
+  voter_user_id: string;
+  vote?: 'A' | 'B' | 'tie';
+  reaction?: 'heart' | 'fire' | 'laugh' | 'surprise';
+  created_at: string;
+}
+
+export interface BlindDateGameState {
+  session: BlindDateSession;
+  my_role: 'A' | 'B';
+  my_avatar_name: string;
+  participants: BlindDateParticipant[];
+  rounds: BlindDateRound[];
+  current_round?: BlindDateRound;
+  designs: BlindDateDesign[];
+  my_designs: BlindDateDesign[];
+}
+
+// Game UI Types
+export interface GameTimer {
+  minutes: number;
+  seconds: number;
+  isActive: boolean;
+  totalSeconds: number;
+}
+
+export interface StyleChoice {
+  category: 'attire' | 'hair' | 'location';
+  option: string;
+  value: any;
+}
+
+export interface GameReaction {
+  type: 'heart' | 'fire' | 'laugh' | 'surprise';
+  emoji: string;
+  label: string;
+}
