@@ -74,14 +74,15 @@ export class GalleryService {
       .from('countries')
       .select('*')
       .eq('iso_code', iso)
-      .single();
+      .limit(1);
     
     if (error) {
       console.error('Error fetching country:', error);
       throw new Error(`Database error: ${error.message}`);
     }
     
-    return data;
+    // Return first result or null if no results
+    return data && data.length > 0 ? data[0] : null;
   }
 
   // ==================== Country Models ====================
@@ -130,15 +131,18 @@ export class GalleryService {
     const { data, error } = await client
       .from('country_models')
       .insert(model)
-      .select()
-      .single();
+      .select();
     
     if (error) {
       console.error('Error creating country model:', error);
       throw new Error(`Database error: ${error.message}`);
     }
     
-    return data;
+    if (!data || data.length === 0) {
+      throw new Error('Failed to create country model - no data returned');
+    }
+    
+    return data[0];
   }
 
   static async updateCountryModel(id: string, updates: Partial<CountryModel>): Promise<CountryModel> {
@@ -147,15 +151,18 @@ export class GalleryService {
       .from('country_models')
       .update(updates)
       .eq('id', id)
-      .select()
-      .single();
+      .select();
     
     if (error) {
       console.error('Error updating country model:', error);
       throw new Error(`Database error: ${error.message}`);
     }
     
-    return data;
+    if (!data || data.length === 0) {
+      throw new Error(`Country model with id ${id} not found or could not be updated`);
+    }
+    
+    return data[0];
   }
 
   // ==================== Styles ====================
@@ -192,14 +199,14 @@ export class GalleryService {
       .from('styles')
       .select('*')
       .eq('id', id)
-      .single();
+      .limit(1);
     
     if (error) {
       console.error('Error fetching style by ID:', error);
       return null;
     }
     
-    return data;
+    return data && data.length > 0 ? data[0] : null;
   }
 
   static async createStyle(style: Omit<Style, 'id' | 'created_at' | 'updated_at'>): Promise<Style> {
@@ -207,15 +214,18 @@ export class GalleryService {
     const { data, error } = await client
       .from('styles')
       .insert(style)
-      .select()
-      .single();
+      .select();
     
     if (error) {
       console.error('Error creating style:', error);
       throw new Error(`Database error: ${error.message}`);
     }
     
-    return data;
+    if (!data || data.length === 0) {
+      throw new Error('Failed to create style - no data returned');
+    }
+    
+    return data[0];
   }
 
   // ==================== Generation Queue ====================
@@ -224,14 +234,14 @@ export class GalleryService {
     console.log('Debug: addToQueue called with request:', request);
     
     // Get country and model info
-    const country = await this.getCountryByISO(request.countryISO);
+    const country = await this.getCountryByISO(request.iso);
     if (!country) {
-      throw new Error(`Country not found: ${request.countryISO}`);
+      throw new Error(`Country not found: ${request.iso}`);
     }
     
-    const model = await this.getCountryModelByRole(request.countryISO, request.role);
+    const model = await this.getCountryModelByRole(request.iso, request.role);
     if (!model) {
-      throw new Error(`${request.role} model not found for ${request.countryISO}`);
+      throw new Error(`${request.role} model not found for ${request.iso}`);
     }
     
     console.log('Debug: Found country:', country);
@@ -252,13 +262,18 @@ export class GalleryService {
         variations: request.variations || 1,
         created_by: (await client.auth.getUser()).data.user?.id
       })
-      .select()
-      .single();
+      .select();
     
     if (queueError) {
       console.error('Error adding to queue:', queueError);
       throw new Error(`Queue error: ${queueError.message}`);
     }
+    
+    if (!queueData || queueData.length === 0) {
+      throw new Error('Failed to add to queue - no data returned');
+    }
+    
+    const queueItem = queueData[0];
 
     // For now, simulate immediate completion and create generated image
     const style = await this.getStyleById(request.styleId);
@@ -268,7 +283,7 @@ export class GalleryService {
         country_id: country.id,
         model_id: model.id,
         style_id: request.styleId,
-        queue_id: queueData.id,
+        queue_id: queueItem.id,
         role: request.role,
         image_url: model.source_image_url, // Use model image as placeholder for now
         image_path: `generated/${country.iso_code}/${request.role}/${request.styleId}/${Date.now()}.jpg`,
@@ -283,8 +298,7 @@ export class GalleryService {
         is_active: true,
         created_by: (await client.auth.getUser()).data.user?.id
       })
-      .select()
-      .single();
+      .select();
     
     if (generatedError) {
       console.error('Error creating generated image:', generatedError);
@@ -300,10 +314,10 @@ export class GalleryService {
         progress: 100, 
         completed_at: new Date().toISOString() 
       })
-      .eq('id', queueData.id);
+      .eq('id', queueItem.id);
     
     return {
-      ...queueData,
+      ...queueItem,
       status: 'completed',
       progress: 100,
       completed_at: new Date().toISOString()
@@ -312,9 +326,9 @@ export class GalleryService {
 
   static async batchAddToQueue(request: BatchGenerateRequest): Promise<GenerationQueueItem[]> {
     const items = await Promise.all(
-      request.styles.map(styleId => 
+      request.styleIds.map(styleId => 
         this.addToQueue({
-          countryISO: request.countryISO,
+          iso: request.iso,
           styleId,
           role: request.role,
           priority: request.priority
@@ -324,18 +338,27 @@ export class GalleryService {
     return items;
   }
 
-  static async getQueueStatus(countryISO: string, role: ModelRole): Promise<GenerationQueueItem[]> {
-    const country = await this.getCountryByISO(countryISO);
-    if (!country) return [];
+  static async getQueueStatus(): Promise<GenerationQueueItem[]>;
+  static async getQueueStatus(countryISO: string, role: ModelRole): Promise<GenerationQueueItem[]>;
+  static async getQueueStatus(countryISO?: string, role?: ModelRole): Promise<GenerationQueueItem[]> {
+    console.log('Debug: getQueueStatus called with:', { countryISO, role });
     
     const client = this.checkSupabase();
-    const { data, error } = await client
-      .from('generation_queue')
-      .select('*')
-      .eq('country_id', country.id)
-      .eq('role', role)
+    let query = client.from('generation_queue').select('*');
+    
+    // If parameters are provided, filter by them
+    if (countryISO && role) {
+      const country = await this.getCountryByISO(countryISO);
+      if (!country) return [];
+      
+      query = query
+        .eq('country_id', country.id)
+        .eq('role', role);
+    }
+    
+    const { data, error } = await query
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(50);
     
     if (error) {
       console.error('Error fetching queue status:', error);
@@ -447,6 +470,125 @@ export class GalleryService {
     console.log('Debug: Generated images cleared successfully');
   }
 
+  static async getFeaturedImages(limit: number = 30): Promise<GeneratedImage[]> {
+    console.log('Debug: getFeaturedImages called with limit:', limit);
+    
+    const client = this.checkSupabase();
+    const { data, error } = await client
+      .from('generated_images')
+      .select('*')
+      .eq('is_featured', true)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error('Error fetching featured images:', error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    
+    console.log('Debug: Returning featured images:', {
+      total: (data || []).length,
+      limit
+    });
+    
+    return data || [];
+  }
+
+  static async incrementViewCount(imageId: string): Promise<void> {
+    console.log('Debug: incrementViewCount called for image:', imageId);
+    
+    const client = this.checkSupabase();
+    const { error } = await client
+      .rpc('increment_view_count', { image_id: imageId });
+    
+    if (error) {
+      // Fallback to manual increment if RPC function doesn't exist
+      console.warn('RPC function not available, using manual increment:', error.message);
+      
+      const { data: currentImage, error: fetchError } = await client
+        .from('generated_images')
+        .select('view_count')
+        .eq('id', imageId)
+        .limit(1);
+      
+      if (fetchError) {
+        console.error('Error fetching current view count:', fetchError);
+        throw new Error(`Database error: ${fetchError.message}`);
+      }
+      
+      const currentViewCount = currentImage && currentImage.length > 0 ? currentImage[0].view_count : 0;
+      
+      const { error: updateError } = await client
+        .from('generated_images')
+        .update({ 
+          view_count: currentViewCount + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', imageId);
+      
+      if (updateError) {
+        console.error('Error incrementing view count:', updateError);
+        throw new Error(`Database error: ${updateError.message}`);
+      }
+    }
+    
+    console.log('Debug: View count incremented successfully');
+  }
+
+  static async uploadGeneratedImage(
+    blob: Blob, 
+    countryISO: string, 
+    role: string, 
+    fileName: string
+  ): Promise<{ url: string; path: string }> {
+    console.log('Debug: uploadGeneratedImage called with:', { 
+      countryISO, 
+      role, 
+      fileName,
+      blobSize: blob.size,
+      blobType: blob.type
+    });
+    
+    const client = this.checkSupabase();
+    
+    // Generate unique file path
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileExtension = fileName.split('.').pop() || 'jpg';
+    const filePath = `generated/${countryISO}/${role}/${timestamp}-${randomSuffix}.${fileExtension}`;
+    
+    console.log('Debug: Uploading to path:', filePath);
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await client.storage
+      .from('generated-images')
+      .upload(filePath, blob, {
+        contentType: blob.type || 'image/jpeg',
+        upsert: false
+      });
+    
+    if (uploadError) {
+      console.error('Error uploading generated image:', uploadError);
+      throw new Error(`Upload error: ${uploadError.message}`);
+    }
+    
+    console.log('Debug: Upload successful:', uploadData);
+    
+    // Get public URL
+    const { data: urlData } = client.storage
+      .from('generated-images')
+      .getPublicUrl(filePath);
+    
+    const result = {
+      url: urlData.publicUrl,
+      path: filePath
+    };
+    
+    console.log('Debug: uploadGeneratedImage completed:', result);
+    return result;
+  }
+
   // ==================== Countries with Models ====================
   
   static async getCountriesWithModels(): Promise<CountryWithModels[]> {
@@ -513,6 +655,227 @@ export class GalleryService {
         callback
       )
       .subscribe();
+  }
+
+  static subscribeToGalleryUpdates(callback: (payload: any) => void) {
+    const client = this.checkSupabase();
+    return client
+      .channel('gallery-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'generated_images'
+        },
+        callback
+      )
+      .subscribe();
+  }
+
+  // ==================== Style Application Logging ====================
+  
+  static async logStyleApplicationAction(
+    action: string,
+    countryIso: string,
+    role: string,
+    styleId: string,
+    imageId?: string,
+    details?: any
+  ): Promise<void> {
+    console.log('Debug: logStyleApplicationAction called:', { 
+      action, 
+      countryIso, 
+      role, 
+      styleId, 
+      imageId, 
+      details 
+    });
+    
+    try {
+      const client = this.checkSupabase();
+      const { error } = await client
+        .from('style_application_logs')
+        .insert({
+          action,
+          country_iso: countryIso,
+          role,
+          style_id: styleId,
+          image_id: imageId,
+          details: details || {},
+          timestamp: new Date().toISOString(),
+          user_id: (await client.auth.getUser()).data.user?.id
+        });
+      
+      if (error) {
+        console.error('Error logging style application action:', error);
+        // Don't throw error for logging failures to avoid breaking the main flow
+      } else {
+        console.log('Debug: Style application action logged successfully');
+      }
+    } catch (error) {
+      console.error('Error in logStyleApplicationAction:', error);
+      // Don't throw error for logging failures
+    }
+  }
+
+  // ==================== Model Image Upload ====================
+  
+  static async uploadModelImage(
+    file: File, 
+    countryIso: string, 
+    role: string,
+    saveToStorage: boolean = true
+  ): Promise<{ url: string; path: string; sha256: string }> {
+    console.log('Debug: uploadModelImage called with:', { 
+      countryIso, 
+      role, 
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      saveToStorage
+    });
+    
+    if (!saveToStorage) {
+      // Return mock data for demo purposes
+      const mockUrl = URL.createObjectURL(file);
+      this.objectUrls.add(mockUrl);
+      return {
+        url: mockUrl,
+        path: `demo/models/${countryIso}/${role}/${file.name}`,
+        sha256: `demo-${Date.now()}`
+      };
+    }
+    
+    const client = this.checkSupabase(true); // Require admin access
+    
+    // Generate file hash for deduplication
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Generate unique file path
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop() || 'jpg';
+    const filePath = `models/${countryIso}/${role}/${timestamp}-${sha256.substring(0, 8)}.${fileExtension}`;
+    
+    console.log('Debug: Uploading model image to path:', filePath);
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await client.storage
+      .from('country-models')
+      .upload(filePath, file, {
+        contentType: file.type || 'image/jpeg',
+        upsert: false
+      });
+    
+    if (uploadError) {
+      console.error('Error uploading model image:', uploadError);
+      throw new Error(`Upload error: ${uploadError.message}`);
+    }
+    
+    console.log('Debug: Model image upload successful:', uploadData);
+    
+    // Get public URL
+    const { data: urlData } = client.storage
+      .from('country-models')
+      .getPublicUrl(filePath);
+    
+    const result = {
+      url: urlData.publicUrl,
+      path: filePath,
+      sha256
+    };
+    
+    console.log('Debug: uploadModelImage completed:', result);
+    return result;
+  }
+
+  static async createOrUpdateModel(
+    countryId: string,
+    role: string,
+    imageUrl: string,
+    imagePath: string,
+    sha256: string,
+    metadata: any = {},
+    saveToDatabase: boolean = true
+  ): Promise<CountryModel> {
+    console.log('Debug: createOrUpdateModel called with:', { 
+      countryId, 
+      role, 
+      imageUrl, 
+      imagePath,
+      sha256,
+      metadata,
+      saveToDatabase 
+    });
+    
+    if (!saveToDatabase) {
+      // Return a mock model for demo purposes
+      return {
+        id: `demo-${Date.now()}`,
+        country_id: countryId,
+        role: role as ModelRole,
+        source_image_url: imageUrl,
+        source_image_path: imagePath,
+        source_image_sha256: sha256,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata
+      };
+    }
+    
+    const client = this.checkSupabase(true);
+    
+    // Check if model already exists for this country and role
+    const { data: existingModel, error: fetchError } = await client
+      .from('country_models')
+      .select('*')
+      .eq('country_id', countryId)
+      .eq('role', role)
+      .limit(1);
+    
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error checking for existing model:', fetchError);
+      throw new Error(`Database error: ${fetchError.message}`);
+    }
+    
+    const existingModelRecord = existingModel && existingModel.length > 0 ? existingModel[0] : null;
+    
+    const modelData = {
+      country_id: countryId,
+      role: role as ModelRole,
+      source_image_url: imageUrl,
+      source_image_path: imagePath,
+      source_image_sha256: sha256,
+      metadata: {
+        ...metadata,
+        uploaded_at: new Date().toISOString()
+      }
+    };
+    
+    let result: CountryModel;
+    
+    if (existingModelRecord) {
+      // Update existing model
+      console.log('Debug: Updating existing model:', existingModelRecord.id);
+      result = await this.updateCountryModel(existingModelRecord.id, {
+        ...modelData,
+        updated_at: new Date().toISOString()
+      });
+    } else {
+      // Create new model
+      console.log('Debug: Creating new model');
+      result = await this.createCountryModel({
+        ...modelData,
+        is_active: true
+      });
+    }
+    
+    console.log('Debug: createOrUpdateModel completed:', result);
+    return result;
   }
 
   // ==================== Cleanup ====================

@@ -27,10 +27,13 @@ export class DatabaseService {
         bride_name: brideName || null,
         groom_name: groomName || null,
       })
-      .select()
-      .single();
+      .select();
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   static async getUserProjects(userId: string): Promise<{ data: PreWeddingProject[] | null; error: any }> {
@@ -54,10 +57,13 @@ export class DatabaseService {
       .from('pre_wedding_projects')
       .update(updates)
       .eq('id', projectId)
-      .select()
-      .single();
+      .select();
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   static async deleteProject(projectId: string): Promise<{ error: any }> {
@@ -87,10 +93,13 @@ export class DatabaseService {
         image_type: imageType,
         config_used: configUsed,
       })
-      .select()
-      .single();
+      .select();
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   static async getProjectImages(
@@ -129,9 +138,13 @@ export class DatabaseService {
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .limit(1);
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   // Storage Management (for uploading images to Supabase Storage)
@@ -189,10 +202,13 @@ export class DatabaseService {
         title: title || null,
         notes: notes || null,
       })
-      .select()
-      .single();
+      .select();
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   static async getFavorites(userId: string): Promise<{ data: any[] | null; error: any }> {
@@ -306,8 +322,7 @@ export class DatabaseService {
           completed_at: challengeData.completed_at,
           user_id: (await supabase.auth.getUser()).data.user?.id || null
         })
-        .select()
-        .single();
+        .select();
 
       if (error) {
         console.warn('Database save failed, using fallback storage:', error);
@@ -320,8 +335,20 @@ export class DatabaseService {
           error: null 
         };
       }
+      
+      const savedRecord = data && data.length > 0 ? data[0] : null;
+      if (!savedRecord) {
+        // Fallback if no record returned
+        return { 
+          data: { 
+            id: `fallback-${Date.now()}`, 
+            image_url: storageResult?.publicUrl || challengeData.generated_image 
+          }, 
+          error: null 
+        };
+      }
 
-      return { data, error: null };
+      return { data: savedRecord, error: null };
     } catch (err) {
       console.error('Error saving banana challenge:', err);
       // Return graceful fallback
@@ -415,8 +442,7 @@ export class DatabaseService {
           created_at: slideshowData.created_at,
           user_id: (await supabase.auth.getUser()).data.user?.id || null
         })
-        .select()
-        .single();
+        .select();
 
       if (error) {
         console.warn('Database save failed, using fallback storage:', error);
@@ -428,8 +454,20 @@ export class DatabaseService {
           error: null 
         };
       }
+      
+      const savedRecord = data && data.length > 0 ? data[0] : null;
+      if (!savedRecord) {
+        // Fallback if no record returned
+        return { 
+          data: { 
+            id: `fallback-${Date.now()}`, 
+            slideshow_url: slideshowStorageResult?.publicUrl || generatedSlideshowUrl 
+          }, 
+          error: null 
+        };
+      }
 
-      return { data, error: null };
+      return { data: savedRecord, error: null };
     } catch (err) {
       console.error('Error saving voice slideshow:', err);
       return { 

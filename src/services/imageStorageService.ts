@@ -221,8 +221,7 @@ export class ImageStorageService {
           config_used: config,
           is_downloaded: false
         })
-        .select()
-        .single();
+        .select();
 
       const { data, error } = await insertPromise;
 
@@ -231,8 +230,13 @@ export class ImageStorageService {
         // Fallback: try to save to pre_wedding_projects table instead
         return await this.saveToProjectsFallback(projectId, imageUrl, imageType, config);
       }
+      
+      if (!data || data.length === 0) {
+        console.warn('No data returned from insert, using fallback');
+        return await this.saveToProjectsFallback(projectId, imageUrl, imageType, config);
+      }
 
-      return data;
+      return data[0];
     } catch (error) {
       console.error('Database save failed, using fallback:', error);
       // Final fallback: create mock data
@@ -270,13 +274,16 @@ export class ImageStorageService {
           updated_at: new Date().toISOString()
         })
         .eq('id', projectId)
-        .select()
-        .single();
+        .select();
 
       const { data, error } = await updatePromise;
 
       if (error) {
         throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        throw new Error('No project found with the specified ID');
       }
 
       console.log('Successfully saved to projects table');

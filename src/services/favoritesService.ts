@@ -27,10 +27,13 @@ export class FavoritesService {
         title: title || null,
         notes: notes || null,
       })
-      .select()
-      .single();
+      .select();
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   // Remove from favorites
@@ -75,10 +78,13 @@ export class FavoritesService {
       .from('favorites')
       .update(updates)
       .eq('id', favoriteId)
-      .select()
-      .single();
+      .select();
 
-    return { data, error };
+    if (error) {
+      return { data: null, error };
+    }
+    
+    return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
   // Check if image is favorited
@@ -92,9 +98,14 @@ export class FavoritesService {
       .select('id')
       .eq('user_id', userId)
       .eq('image_id', imageId)
-      .single();
+      .limit(1);
 
-    return { data: !!data, error: error?.code === 'PGRST116' ? null : error };
+    // PGRST116 means "No rows found" which is expected for non-favorites
+    if (error && error.code !== 'PGRST116') {
+      return { data: false, error };
+    }
+    
+    return { data: !!(data && data.length > 0), error: null };
   }
 
   // Get favorites by type
