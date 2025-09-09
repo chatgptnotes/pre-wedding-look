@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   // Check if we're in development mode with auth bypass
   const isDevelopment = import.meta.env.DEV;
-  const bypassAuth = isDevelopment; // Can be configured
+  const bypassAuth = false; // Can be configured - set to false to enable auth in development
 
   useEffect(() => {
     let mounted = true;
@@ -106,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'SIGNED_IN' && session?.user && supabase) {
           try {
             const { error } = await supabase
-              .from('user_profiles')
+              .from('profiles')
               .upsert({
                 id: session.user.id,
                 email: session.user.email,
@@ -151,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!error && data.user) {
       // Create user profile
       const { error: profileError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .insert({
           id: data.user.id,
           email: data.user.email,
@@ -172,11 +172,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!supabase || bypassAuth) {
       return { error: { message: 'Authentication not available in demo mode' } };
     }
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    
+    console.log('Attempting sign in with email:', email);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        return { error };
+      }
+      
+      console.log('Sign in successful:', data);
+      return { error: null };
+    } catch (err) {
+      console.error('Sign in exception:', err);
+      return { error: { message: 'Unexpected error during sign in' } };
+    }
   };
 
   const signInWithGoogle = async () => {

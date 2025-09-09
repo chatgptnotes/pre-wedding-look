@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
-import LandingPage from './components/LandingPage';
+import LandingPageEnhanced from './components/LandingPageEnhanced';
 import Header from './components/Header';
 import TabNavigation, { TabId } from './components/TabNavigation';
 import OptionSelector from './components/OptionSelector';
@@ -34,7 +34,7 @@ type AppStage = 'landing' | 'bride' | 'groom' | 'couple' | 'tabs' | 'admin';
 
 const AppContent: React.FC = () => {
   // Temporary bypass authentication for development
-  const BYPASS_AUTH = true; // Set to false to re-enable authentication
+  const BYPASS_AUTH = false; // Set to false to re-enable authentication
   
   // When bypassing auth, don't use auth loading state to prevent navigation loops
   const { loading: authLoading, user } = useAuth();
@@ -275,7 +275,7 @@ const AppContent: React.FC = () => {
 
   // Show landing page first
   if (stage === 'landing') {
-    return <LandingPage onGetStarted={handleGetStarted} onExploreMode={handleExploreMode} />;
+    return <LandingPageEnhanced onGetStarted={handleGetStarted} onExploreMode={handleExploreMode} />;
   }
 
   // Show admin page

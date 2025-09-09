@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { default as GameTimerComponent } from '../blinddate/GameTimer';
 import RoundStyling from '../blinddate/RoundStyling';
 import RevealScreen from '../blinddate/RevealScreen';
-import MatchmakingScreen from '../blinddate/MatchmakingScreen';
+import MatchmakingWithTimeout from '../blinddate/MatchmakingWithTimeout';
 import WaitingRoom from '../blinddate/WaitingRoom';
 
 const BlindDateTab: React.FC = () => {
@@ -157,6 +157,36 @@ const BlindDateTab: React.FC = () => {
     if (!currentSessionId || !gameState?.current_round) return;
 
     try {
+      // Check if this is a bot demo session
+      const isBotDemo = currentSessionId.startsWith('bot-demo-');
+      
+      if (isBotDemo) {
+        console.log('Bot demo submission:', { targetRole, styleChoices, imageUrl });
+        
+        // For bot demo, just update local state instead of calling server
+        const newDesign = {
+          id: `design-${Date.now()}`,
+          session_id: currentSessionId,
+          round_id: gameState.current_round.id,
+          designer_user_id: 'current-user',
+          target_role: targetRole,
+          prompt: styleChoices,
+          image_url: imageUrl || null,
+          created_at: new Date().toISOString()
+        };
+        
+        // Update the game state with the new design
+        setGameState(prevState => ({
+          ...prevState,
+          designs: [...(prevState?.designs || []), newDesign],
+          my_designs: [...(prevState?.my_designs || []), newDesign]
+        }));
+        
+        console.log('Bot demo design submitted successfully');
+        return;
+      }
+
+      // Real multiplayer mode - call server
       await BlindDateService.submitDesign(
         currentSessionId,
         gameState.current_round.id,
@@ -165,7 +195,7 @@ const BlindDateTab: React.FC = () => {
         imageUrl
       );
 
-      // Refresh game state
+      // Refresh game state from server
       const updatedState = await BlindDateService.getGameState(currentSessionId);
       setGameState(updatedState);
 
@@ -234,10 +264,90 @@ const BlindDateTab: React.FC = () => {
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.3 }}
           >
-            <MatchmakingScreen
-              onJoinGame={handleJoinGame}
-              onCreatePrivateGame={handleCreatePrivateGame}
-              isLoading={isLoading}
+            <MatchmakingWithTimeout
+              onGameStarted={async (sessionData) => {
+                console.log('BlindDateTab onGameStarted called with:', sessionData);
+                setCurrentSessionId(sessionData.sessionId);
+                setError(null);
+                
+                try {
+                  // Handle bot demo mode differently
+                  if (sessionData.bot_mode) {
+                    console.log('Setting up bot demo game state');
+                    
+                    // Create mock game state for bot demo
+                    const mockGameState = {
+                      session: {
+                        id: sessionData.sessionId,
+                        status: 'active',
+                        is_private: false,
+                        created_at: new Date().toISOString(),
+                        ended_at: null
+                      },
+                      participants: [
+                        {
+                          session_id: sessionData.sessionId,
+                          user_id: 'current-user',
+                          role: 'A',
+                          joined_at: new Date().toISOString(),
+                          is_revealed: false,
+                          avatar_name: sessionData.avatar_name,
+                          is_me: true
+                        },
+                        {
+                          session_id: sessionData.sessionId,
+                          user_id: 'ai-bot',
+                          role: 'B',
+                          joined_at: new Date().toISOString(),
+                          is_revealed: false,
+                          avatar_name: 'AI Style Buddy',
+                          is_me: false
+                        }
+                      ],
+                      current_round: {
+                        id: `round-1-${Date.now()}`,
+                        session_id: sessionData.sessionId,
+                        round_no: 1,
+                        topic: 'attire',
+                        started_at: new Date().toISOString(),
+                        ended_at: null,
+                        time_limit_seconds: 180
+                      },
+                      rounds: [],
+                      designs: [],
+                      my_designs: [],
+                      my_role: 'A'
+                    };
+                    
+                    setGameState(mockGameState);
+                    setGamePhase('playing');
+                    console.log('Bot demo game state set, transitioning to playing phase');
+                    
+                  } else {
+                    // Regular multiplayer mode - fetch from server
+                    console.log('Fetching real game state from server');
+                    const state = await BlindDateService.getGameState(sessionData.sessionId);
+                    setGameState(state);
+                    
+                    // Determine phase based on game state
+                    if (state.session.status === 'waiting') {
+                      setGamePhase('waiting');
+                    } else if (state.session.status === 'active') {
+                      setGamePhase('playing');
+                    } else if (state.session.status === 'reveal') {
+                      setGamePhase('reveal');
+                    }
+                  }
+                  
+                } catch (err) {
+                  console.error('Error fetching game state:', err);
+                  setError('Failed to load game state');
+                }
+              }}
+              onError={(error) => {
+                setError(error);
+                setIsLoading(false);
+              }}
             />
           </motion.div>
         )}

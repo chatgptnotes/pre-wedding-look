@@ -16,7 +16,7 @@ export class BlindDateService {
     status: 'waiting' | 'active';
     participant_count: number;
   }> {
-    const { data, error } = await supabase.functions.invoke('blinddate-matchmaking', {
+    const { data, error } = await supabase.functions.invoke('blinddate-matchmaking-enhanced', {
       body: {
         action: 'join',
         invite_code: inviteCode
@@ -35,7 +35,7 @@ export class BlindDateService {
     avatar_name: string;
     status: 'waiting';
   }> {
-    const { data, error } = await supabase.functions.invoke('blinddate-matchmaking', {
+    const { data, error } = await supabase.functions.invoke('blinddate-matchmaking-enhanced', {
       body: {
         action: 'create_private'
       }
@@ -47,7 +47,7 @@ export class BlindDateService {
 
   // Leave current game
   static async leaveGame(): Promise<void> {
-    const { error } = await supabase.functions.invoke('blinddate-matchmaking', {
+    const { error } = await supabase.functions.invoke('blinddate-matchmaking-enhanced', {
       body: {
         action: 'leave'
       }
