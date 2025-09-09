@@ -1,8 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // This endpoint will be called by Vercel cron jobs
-  if (req.method !== 'POST') {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // This endpoint will be called by Vercel cron jobs (using GET method)
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 

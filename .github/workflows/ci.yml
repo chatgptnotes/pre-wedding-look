@@ -1,0 +1,440 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  FORCE_COLOR: 1
+
+jobs:
+  # Static Analysis & Unit Tests
+  test-unit:
+    name: Unit Tests & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint code
+        run: npx eslint src --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+      - name: Run unit tests
+        run: npm run test:run
+
+      - name: Generate test coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/clover.xml
+          flags: unittests
+          name: codecov-umbrella
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Build Verification
+  build:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Check build size
+        run: |
+          BUILD_SIZE=$(du -sh dist | cut -f1)
+          echo "Build size: $BUILD_SIZE"
+          echo "build_size=$BUILD_SIZE" >> $GITHUB_ENV
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7
+
+  # E2E Testing with Playwright
+  test-e2e:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: build
+    
+    env:
+      # Supabase test instance (you'll need to set these as repository secrets)
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      # Stripe test keys
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_WEBHOOK_SECRET }}
+      BASE_URL: http://localhost:5173
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo "PREVIEW_PID=$!" >> $GITHUB_ENV
+          # Wait for server to be ready
+          npx wait-on http://localhost:4173 --timeout 60000
+
+      - name: Seed test data
+        run: npm run test:seed
+        env:
+          BASE_URL: http://localhost:4173
+
+      - name: Run E2E tests
+        run: npx playwright test --project=${{ matrix.browser }}
+        env:
+          BASE_URL: http://localhost:4173
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-screenshots-${{ matrix.browser }}
+          path: tests/screenshots/
+          retention-days: 7
+
+      - name: Cleanup test data
+        run: npm run test:clean
+        if: always()
+
+      - name: Stop preview server
+        run: kill $PREVIEW_PID
+        if: always()
+
+  # Lighthouse Performance Testing
+  lighthouse:
+    name: Lighthouse Performance
+    runs-on: ubuntu-latest
+    needs: build
+    
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+
+      - name: Start preview server
+        run: |
+          npm run preview &
+          echo "PREVIEW_PID=$!" >> $GITHUB_ENV
+          npx wait-on http://localhost:4173 --timeout 60000
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.12.x
+
+      - name: Run Lighthouse CI
+        run: |
+          lhci collect \
+            --url=http://localhost:4173 \
+            --url=http://localhost:4173/blind-date \
+            --numberOfRuns=3 \
+            --additive
+          
+          lhci assert \
+            --assertions.categories.performance=0.9 \
+            --assertions.categories.accessibility=0.95 \
+            --assertions.categories.best-practices=0.9 \
+            --assertions.categories.seo=0.8 \
+            --assertions.categories.pwa=0.8
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          retention-days: 7
+
+      - name: Comment Lighthouse results
+        if: github.event_name == 'pull_request'
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          configPath: .lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Stop preview server
+        run: kill $PREVIEW_PID
+        if: always()
+
+  # Security Scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level=high
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+        continue-on-error: true
+
+  # Bundle Analysis
+  bundle-analysis:
+    name: Bundle Analysis
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install bundle analyzer
+        run: npm install --save-dev webpack-bundle-analyzer vite-bundle-analyzer
+
+      - name: Analyze bundle
+        run: |
+          npx vite-bundle-analyzer dist/
+          echo "Bundle analysis completed"
+
+      - name: Check bundle size limits
+        run: |
+          # Check if main bundle is under 1MB
+          MAIN_SIZE=$(stat -c%s dist/assets/*.js | head -1)
+          if [ $MAIN_SIZE -gt 1048576 ]; then
+            echo "❌ Main bundle size ($MAIN_SIZE bytes) exceeds 1MB limit"
+            exit 1
+          else
+            echo "✅ Main bundle size: $MAIN_SIZE bytes"
+          fi
+
+  # Deployment Preview (for PRs)
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-e2e, lighthouse]
+    if: github.event_name == 'pull_request'
+    
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project artifacts
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_ENV
+
+      - name: Comment deployment URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Preview Deployment Ready**
+              
+              **URL**: ${process.env.deployment_url}
+              
+              **Tests Summary**:
+              - ✅ Unit tests passed
+              - ✅ E2E tests passed  
+              - ✅ Lighthouse performance ≥90
+              
+              Changes will be automatically deployed to production when merged to main.`
+            })
+
+  # Production Deployment (on main branch)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-e2e, lighthouse, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_ENV
+
+      - name: Create deployment status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment?.id,
+              state: 'success',
+              environment_url: process.env.deployment_url,
+              description: 'Deployed to production'
+            })
+
+  # Notification Summary
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-e2e, lighthouse, security, bundle-analysis]
+    if: always() && (github.event_name == 'push' || github.event_name == 'pull_request')
+    
+    steps:
+      - name: Determine overall status
+        id: status
+        run: |
+          if [[ "${{ needs.test-unit.result }}" == "success" && 
+                "${{ needs.test-e2e.result }}" == "success" && 
+                "${{ needs.lighthouse.result }}" == "success" && 
+                "${{ needs.security.result }}" == "success" && 
+                "${{ needs.bundle-analysis.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=All checks passed! 🎉" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=Some checks failed ❌" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create summary
+        run: |
+          echo "## CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.test-unit.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.test-e2e.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lighthouse | ${{ needs.lighthouse.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bundle Analysis | ${{ needs.bundle-analysis.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status**: ${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY
