@@ -4,12 +4,6 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "devCommand": "npm run dev",
-  "env": {
-    "VITE_SUPABASE_URL": "@supabase-url",
-    "VITE_SUPABASE_ANON_KEY": "@supabase-anon-key",
-    "VITE_GEMINI_API_KEY": "@gemini-api-key",
-    "VITE_GOOGLE_CLIENT_ID": "@google-client-id"
-  },
   "functions": {
     "app/api/**/*.ts": {
       "runtime": "@vercel/node"
