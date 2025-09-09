@@ -10,7 +10,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "commit": "./auto-commit.sh",
+    "commit:msg": "./auto-commit.sh"
   },
   "dependencies": {
     "@google/genai": "^1.16.0",
