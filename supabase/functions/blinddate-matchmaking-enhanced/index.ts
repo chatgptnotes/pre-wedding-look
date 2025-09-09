@@ -10,6 +10,39 @@ const corsHeaders = {
 const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000000';
 const WAITING_TIMEOUT_SECONDS = 45;
 
+// Retry utility function with exponential backoff
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000,
+  operationName: string = 'operation'
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Attempting ${operationName} (attempt ${attempt}/${maxRetries})`);
+      const result = await operation();
+      if (attempt > 1) {
+        console.log(`✅ ${operationName} succeeded on attempt ${attempt}`);
+      }
+      return result;
+    } catch (error) {
+      console.error(`❌ ${operationName} failed on attempt ${attempt}:`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.error(`💥 ${operationName} failed after ${maxRetries} attempts`);
+        throw error;
+      }
+      
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+      console.log(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw new Error(`Max retries exceeded for ${operationName}`);
+}
+
 interface MatchmakeRequest {
   action?: string;
   prefs?: any;
@@ -117,41 +150,74 @@ serve(async (req) => {
 });
 
 async function handleInviteCode(supabaseClient: any, userId: string, inviteCode: string) {
-  // Try to join existing session with invite code
-  const { data: existingSession, error } = await supabaseClient
-    .from('blinddate_sessions')
-    .select('*')
-    .eq('invite_code', inviteCode)
-    .eq('status', 'waiting')
-    .single();
+  // Try to join existing session with invite code using retry logic
+  const existingSession = await retryWithBackoff(async () => {
+    const { data: existingSession, error } = await supabaseClient
+      .from('blinddate_sessions')
+      .select('*')
+      .eq('invite_code', inviteCode)
+      .eq('status', 'waiting')
+      .single();
 
-  if (error || !existingSession) {
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No session found with this invite code
+        console.log('No session found with invite code:', inviteCode);
+        return null;
+      }
+      throw error;
+    }
+
+    return existingSession;
+  }, 3, 1000, 'invite code lookup');
+
+  if (!existingSession) {
     // Invalid code - create new waiting session and return new invite
+    console.log('Creating new session for invalid invite code');
     return await createWaitingSession(supabaseClient, userId, true);
   }
 
   // Join as Player B
+  console.log('Joining existing session:', existingSession.id);
   return await joinSession(supabaseClient, userId, existingSession.id, 'B');
 }
 
 async function handleMatchmaking(supabaseClient: any, userId: string, isPrivate: boolean, prefs?: any) {
   // Check for existing waiting sessions (only for public matches)
   if (!isPrivate) {
-    const { data: waitingSessions } = await supabaseClient
-      .from('blinddate_sessions')
-      .select(`
-        *,
-        blinddate_participants(count)
-      `)
-      .eq('status', 'waiting')
-      .eq('is_private', false)
-      .lt('blinddate_participants.count', 2)
-      .order('created_at', { ascending: true });
+    const waitingSession = await retryWithBackoff(async () => {
+      // Optimized query - get just the first available session with participant count
+      const { data: sessions, error } = await supabaseClient
+        .from('blinddate_sessions')
+        .select(`
+          id,
+          created_at,
+          blinddate_participants!inner(session_id)
+        `)
+        .eq('status', 'waiting')
+        .eq('is_private', false)
+        .order('created_at', { ascending: true })
+        .limit(5); // Limit to reduce data transfer
 
-    if (waitingSessions && waitingSessions.length > 0) {
+      if (error) {
+        throw error;
+      }
+
+      // Find the first session with exactly 1 participant (waiting for Player B)
+      const availableSession = sessions?.find(session => 
+        session.blinddate_participants.length === 1
+      );
+
+      return availableSession;
+    }, 3, 1000, 'available session lookup');
+
+    if (waitingSession) {
       // Join existing session as Player B
-      return await joinSession(supabaseClient, userId, waitingSessions[0].id, 'B');
+      console.log('Found available public session:', waitingSession.id);
+      return await joinSession(supabaseClient, userId, waitingSession.id, 'B');
     }
+    
+    console.log('No available public sessions found, creating new session');
   }
 
   // No matches found - create waiting session
@@ -159,34 +225,55 @@ async function handleMatchmaking(supabaseClient: any, userId: string, isPrivate:
 }
 
 async function createWaitingSession(supabaseClient: any, userId: string, isPrivate: boolean) {
+  console.log('Creating waiting session for user:', userId);
+  
   // Generate invite code
   const inviteCode = generateInviteCode();
+  console.log('Generated invite code:', inviteCode);
   
-  // Create session
-  const { data: session, error: sessionError } = await supabaseClient
-    .from('blinddate_sessions')
-    .insert({
-      status: 'waiting',
-      is_private: isPrivate,
-      invite_code: inviteCode
-    })
-    .select()
-    .single();
+  // Create session with retry logic
+  const session = await retryWithBackoff(async () => {
+    console.log('Attempting to create session in database...');
+    const { data: session, error: sessionError } = await supabaseClient
+      .from('blinddate_sessions')
+      .insert({
+        status: 'waiting',
+        is_private: isPrivate,
+        invite_code: inviteCode
+      })
+      .select()
+      .single();
 
-  if (sessionError) throw sessionError;
+    if (sessionError) {
+      console.error('Session creation failed:', sessionError);
+      throw sessionError;
+    }
+    
+    console.log('Session created successfully:', session.id);
+    return session;
+  }, 3, 1000, 'session creation');
 
-  // Add user as Player A
+  // Add user as Player A with retry logic
   const avatarName = generateAvatarName();
-  const { error: participantError } = await supabaseClient
-    .from('blinddate_participants')
-    .insert({
-      session_id: session.id,
-      user_id: userId,
-      role: 'A',
-      avatar_name: avatarName
-    });
+  await retryWithBackoff(async () => {
+    console.log('Adding participant to session:', { sessionId: session.id, userId, avatarName });
+    
+    const { error: participantError } = await supabaseClient
+      .from('blinddate_participants')
+      .insert({
+        session_id: session.id,
+        user_id: userId,
+        role: 'A',
+        avatar_name: avatarName
+      });
 
-  if (participantError) throw participantError;
+    if (participantError) {
+      console.error('Participant creation failed:', participantError);
+      throw participantError;
+    }
+    
+    console.log('Participant added successfully');
+  }, 3, 1000, 'participant creation');
 
   // Schedule timeout handler
   scheduleWaitingTimeout(supabaseClient, session.id, userId);
@@ -210,33 +297,54 @@ async function createWaitingSession(supabaseClient: any, userId: string, isPriva
 
 async function joinSession(supabaseClient: any, userId: string, sessionId: string, role: 'A' | 'B') {
   const avatarName = generateAvatarName();
+  console.log(`Joining session ${sessionId} as role ${role} with avatar ${avatarName}`);
   
-  // Add user as participant
-  const { error: participantError } = await supabaseClient
-    .from('blinddate_participants')
-    .insert({
-      session_id: sessionId,
-      user_id: userId,
-      role: role,
-      avatar_name: avatarName
-    });
+  // Add user as participant with retry logic
+  await retryWithBackoff(async () => {
+    const { error: participantError } = await supabaseClient
+      .from('blinddate_participants')
+      .insert({
+        session_id: sessionId,
+        user_id: userId,
+        role: role,
+        avatar_name: avatarName
+      });
 
-  if (participantError) throw participantError;
+    if (participantError) {
+      console.error('Failed to add participant:', participantError);
+      throw participantError;
+    }
+    
+    console.log('Participant added successfully');
+  }, 3, 1000, 'participant join');
 
-  // Update session to active
-  const { error: updateError } = await supabaseClient
-    .from('blinddate_sessions')
-    .update({ status: 'active' })
-    .eq('id', sessionId);
+  // Update session to active with retry logic
+  await retryWithBackoff(async () => {
+    const { error: updateError } = await supabaseClient
+      .from('blinddate_sessions')
+      .update({ status: 'active' })
+      .eq('id', sessionId);
 
-  if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Failed to activate session:', updateError);
+      throw updateError;
+    }
+    
+    console.log('Session activated successfully');
+  }, 3, 1000, 'session activation');
 
-  // Create rounds
-  await createGameRounds(supabaseClient, sessionId);
+  // Create rounds with retry logic
+  await retryWithBackoff(async () => {
+    await createGameRounds(supabaseClient, sessionId);
+  }, 2, 1500, 'game rounds creation');
 
-  // Broadcast to realtime channel
-  await broadcastEvent(supabaseClient, sessionId, 'participant_joined', { role, userId });
-  await broadcastEvent(supabaseClient, sessionId, 'status_changed', { status: 'active' });
+  // Broadcast events (best effort - don't retry on failure)
+  try {
+    await broadcastEvent(supabaseClient, sessionId, 'participant_joined', { role, userId });
+    await broadcastEvent(supabaseClient, sessionId, 'status_changed', { status: 'active' });
+  } catch (broadcastError) {
+    console.warn('Broadcasting failed (non-critical):', broadcastError.message);
+  }
 
   return new Response(
     JSON.stringify({

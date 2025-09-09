@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { getAccessToken, isTokenExpired, debugTokens } from '../../utils/tokenStorage';
 import AuthModal from '../AuthModal';
 
 interface MatchmakingWithTimeoutProps {
@@ -155,7 +156,7 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
           action: 'join'
         },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          Authorization: `Bearer ${getAccessToken()}`
         }
       });
 
@@ -198,25 +199,20 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
       return;
     }
 
-    // Use the user object from AuthContext instead of checking session separately
-    // Since we already know user exists, we can create a session from AuthContext
-    console.log('Using existing auth context instead of session check...');
+    // Get token from cookies - much simpler and faster!
+    console.log('🍪 Getting authentication token from cookies...');
+    debugTokens(); // Log current token status for debugging
     
-    // Get the current session from Supabase (but don't wait if it hangs)
-    let sessionToken = null;
-    try {
-      // Quick session check with shorter timeout
-      const sessionCheck = await Promise.race([
-        supabase.auth.getSession(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
-      ]);
-      
-      if (sessionCheck.data?.session?.access_token) {
-        sessionToken = sessionCheck.data.session.access_token;
-        console.log('✅ Got session token from auth check');
-      }
-    } catch (error) {
-      console.log('⚠️ Session check timed out, will try without token...');
+    let sessionToken = getAccessToken();
+    
+    if (!sessionToken) {
+      console.warn('⚠️ WARNING: No authentication token found in cookies');
+      console.warn('This may cause the request to fail, but we\'ll attempt it anyway');
+    } else if (isTokenExpired()) {
+      console.warn('⚠️ WARNING: Authentication token is expired');
+      console.warn('User may need to sign in again');
+    } else {
+      console.log('✅ Got valid authentication token from cookies');
     }
 
     console.log('✅ Proceeding with room creation for user:', user.id);
@@ -279,22 +275,21 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
     try {
       console.log('🚀 Attempting real database call...');
       
-      // Try real database first with shorter timeout
+      // Try real database first with longer timeout
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Database call timed out')), 5000); // Shorter timeout
+        setTimeout(() => reject(new Error('Database call timed out')), 15000); // Longer timeout for database
       });
       
-      // Prepare API call headers
-      const headers = {
+      // Prepare API call headers (with auth token if available)
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
       
-      // Add auth header if we have a session token
       if (sessionToken) {
-        headers.Authorization = `Bearer ${sessionToken}`;
-        console.log('Using session token for API call');
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+        console.log('🚀 Making authenticated API call to create private room');
       } else {
-        console.log('No session token - trying API call without auth');
+        console.log('🚀 Making unauthenticated API call to create private room (may fail)');
       }
       
       const apiPromise = supabase.functions.invoke('blinddate-matchmaking-enhanced', {
@@ -373,57 +368,132 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
       onGameStarted(gameSessionData);
       
     } catch (error: any) {
-      console.error('❌ Database call failed:', error.message);
+      // Comprehensive error logging
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        operation: 'room_creation',
+        user_id: user?.id,
+        user_email: user?.email,
+        error_message: error.message,
+        error_code: error.code,
+        error_details: error.details,
+        stack_trace: error.stack,
+        session_token_present: !!sessionToken,
+        supabase_url: import.meta.env.VITE_SUPABASE_URL,
+        user_agent: navigator.userAgent
+      };
       
-      // If database fails, fall back to functional offline mode
-      if (error.message.includes('timeout') || error.message.includes('Database') || error.message.includes('FunctionsHttpError') || error.message.includes('400') || error.message.includes('non-2xx')) {
-        console.log('🔄 Database unavailable, creating functional offline room...');
+      console.error('❌ Room creation failed - Full error details:', errorDetails);
+      
+      // Show specific error message based on error type
+      let userMessage = 'Unable to create private room. Please check your connection and try again.';
+      
+      if (error.message.includes('timeout') || error.message.includes('timed out')) {
+        console.error('🕐 TIMEOUT ERROR:', { 
+          timeout_duration: '15 seconds',
+          possible_causes: ['Network connectivity', 'Database overload', 'Function cold start']
+        });
         
-        // Create a functional local session that works for testing
-        const offlineSession = {
-          sessionId: `offline-${Date.now()}`,
-          role: 'A',
-          status: 'waiting',
-          inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-          avatarName: `${user.email?.split('@')[0] || 'Player'}`,
-          participant_count: 1
-        };
-        
-        console.log('✅ Created offline functional room:', offlineSession);
-        
-        // Map to expected format
-        const gameSessionData = {
-          sessionId: offlineSession.sessionId,
-          role: offlineSession.role,
-          status: offlineSession.status,
-          inviteCode: offlineSession.inviteCode,
-          avatarName: offlineSession.avatarName,
-          participant_count: 1,
-          session: {
-            id: offlineSession.sessionId,
-            status: offlineSession.status,
-            is_private: true,
-            invite_code: offlineSession.inviteCode
-          },
-          participants: [{
-            session_id: offlineSession.sessionId,
-            user_id: user.id,
-            role: offlineSession.role,
-            avatar_name: offlineSession.avatarName,
-            is_me: true
-          }]
-        };
-        
-        setSessionData(gameSessionData);
-        setMatchState('waiting');
-        
-        console.log('🚀 Transitioning to functional waiting room...');
-        onGameStarted(gameSessionData);
-        return;
+        // Try direct database fallback for timeout errors
+        console.log('🔄 Edge Function timed out - trying direct database approach...');
+        try {
+          const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          
+          // Create session directly in database
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('blinddate_sessions')
+            .insert({
+              status: 'waiting',
+              is_private: true,
+              invite_code: inviteCode,
+              created_by: user.id,
+              max_participants: 2,
+              participant_count: 1
+            })
+            .select()
+            .single();
+
+          if (sessionError) {
+            console.error('❌ Direct database session creation failed:', sessionError);
+            throw sessionError;
+          }
+
+          // Create participant record directly  
+          const { error: participantError } = await supabase
+            .from('blinddate_participants')
+            .insert({
+              session_id: sessionData.id,
+              user_id: user.id,
+              role: 'host',
+              avatar_name: `Avatar${Math.floor(Math.random() * 10) + 1}`,
+              joined_at: new Date().toISOString()
+            });
+
+          if (participantError) {
+            console.error('❌ Direct database participant creation failed:', participantError);
+            throw participantError;
+          }
+
+          console.log('✅ Direct database room creation successful!');
+          
+          // Format the response to match Edge Function format
+          const gameSessionData = {
+            sessionId: sessionData.id,
+            status: sessionData.status,
+            inviteCode: sessionData.invite_code,
+            role: 'host',
+            avatarName: `Avatar${Math.floor(Math.random() * 10) + 1}`,
+            participant_count: 1,
+            session: {
+              id: sessionData.id,
+              status: sessionData.status,
+              is_private: true,
+              invite_code: sessionData.invite_code
+            },
+            participants: [{
+              session_id: sessionData.id,
+              user_id: user.id,
+              role: 'host',
+              avatar_name: `Avatar${Math.floor(Math.random() * 10) + 1}`,
+              is_me: true
+            }]
+          };
+
+          setSessionData(gameSessionData);
+          setMatchState('waiting');
+          console.log('✅ Direct database fallback successful - transitioning to waiting room');
+          onGameStarted(gameSessionData);
+          return; // Exit early on successful fallback
+
+        } catch (fallbackError: any) {
+          console.error('❌ Direct database fallback also failed:', fallbackError);
+          userMessage = 'Both server and database attempts failed. Please try again later.';
+        }
+      } else if (error.message.includes('auth') || error.message.includes('unauthorized') || error.message.includes('JWT')) {
+        userMessage = 'Authentication failed. Please sign out and sign in again.';
+        console.error('🔐 AUTH ERROR:', { 
+          auth_token_present: !!sessionToken,
+          possible_causes: ['Expired session', 'Invalid JWT', 'Missing auth header']
+        });
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        userMessage = 'Network error. Please check your internet connection and try again.';
+        console.error('🌐 NETWORK ERROR:', { 
+          possible_causes: ['No internet connection', 'Supabase server down', 'DNS issues']
+        });
+      } else if (error.message.includes('Database') || error.message.includes('PostgreSQL')) {
+        userMessage = 'Database error. Our team has been notified. Please try again in a moment.';
+        console.error('🗄️ DATABASE ERROR:', { 
+          possible_causes: ['Database connection pool exhausted', 'SQL query error', 'RLS policy issue']
+        });
       }
       
-      // For non-timeout errors, show user-friendly message
-      let userMessage = 'Unable to create private room. Please try again.';
+      // Additional debugging info
+      console.error('🔍 DEBUGGING INFO:', {
+        current_state: matchState,
+        environment: import.meta.env.MODE,
+        supabase_project: import.meta.env.VITE_SUPABASE_URL?.split('.')[0]?.split('//')[1]
+      });
+      
       onError(userMessage);
       setMatchState('idle');
     }
@@ -435,7 +505,7 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
     try {
       // Try real database first
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Database call timed out')), 5000);
+        setTimeout(() => reject(new Error('Database call timed out')), 15000);
       });
       
       const apiPromise = supabase.functions.invoke('blinddate-matchmaking-enhanced', {
@@ -456,52 +526,167 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
         onGameStarted(data);
       }
     } catch (error: any) {
-      console.error('Failed to join with code:', error);
+      // Comprehensive error logging for join operation
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        operation: 'room_join',
+        user_id: user?.id,
+        user_email: user?.email,
+        invite_code: code,
+        error_message: error.message,
+        error_code: error.code,
+        error_details: error.details,
+        stack_trace: error.stack,
+        supabase_url: import.meta.env.VITE_SUPABASE_URL,
+        user_agent: navigator.userAgent
+      };
       
-      // In offline mode, simulate joining a room
-      if (error.message.includes('timeout') || error.message.includes('Database')) {
-        console.log('🔄 Database unavailable, simulating join with code:', code);
+      console.error('❌ Room join failed - Full error details:', errorDetails);
+      
+      // Show specific error message based on error type
+      let userMessage = 'Unable to join game room. Please check your connection and try again.';
+      
+      if (error.message.includes('timeout') || error.message.includes('timed out')) {
+        console.error('🕐 JOIN TIMEOUT ERROR:', { 
+          timeout_duration: '15 seconds',
+          invite_code: code,
+          possible_causes: ['Network connectivity', 'Database overload', 'Function cold start']
+        });
         
-        // Create a simulated join response
-        const offlineJoinData = {
-          sessionId: `offline-join-${Date.now()}`,
-          role: 'B', // Joining player is always Player B
-          status: 'waiting',
-          inviteCode: code,
-          avatarName: user?.email?.split('@')[0] || 'Player 2',
-          participant_count: 2, // Simulate both players joined
-          session: {
-            id: `offline-join-${Date.now()}`,
-            status: 'active', // Start game immediately in offline mode
-            is_private: true,
-            invite_code: code
-          },
-          participants: [
-            {
-              session_id: `offline-join-${Date.now()}`,
-              user_id: 'host-user',
-              role: 'A',
-              avatar_name: 'Host Player',
-              is_me: false
-            },
-            {
-              session_id: `offline-join-${Date.now()}`,
-              user_id: user?.id || 'joining-user',
-              role: 'B',
-              avatar_name: user?.email?.split('@')[0] || 'Player 2',
-              is_me: true
+        // Try direct database fallback for join timeout
+        console.log('🔄 Edge Function timed out - trying direct database join...');
+        try {
+          // First, find the session with the invite code
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('blinddate_sessions')
+            .select(`
+              *,
+              blinddate_participants(*)
+            `)
+            .eq('invite_code', code)
+            .eq('is_private', true)
+            .single();
+
+          if (sessionError) {
+            console.error('❌ Session lookup failed:', sessionError);
+            if (sessionError.code === 'PGRST116') {
+              userMessage = 'Invalid or expired invite code. Please check the code and try again.';
+            } else {
+              userMessage = 'Unable to find room with that invite code.';
             }
-          ]
-        };
-        
-        setSessionData(offlineJoinData);
-        setMatchState('found');
-        console.log('✅ Simulated join successful, starting game');
-        onGameStarted(offlineJoinData);
-      } else {
-        onError(`Failed to join game: ${error.message}`);
-        setMatchState('idle');
+            throw sessionError;
+          }
+
+          // Check if room is full
+          if (sessionData.participant_count >= sessionData.max_participants) {
+            userMessage = 'This room is full. Please ask for a new invite code.';
+            throw new Error('Room is full');
+          }
+
+          // Add the new participant
+          const { error: participantError } = await supabase
+            .from('blinddate_participants')
+            .insert({
+              session_id: sessionData.id,
+              user_id: user.id,
+              role: 'participant',
+              avatar_name: `Avatar${Math.floor(Math.random() * 10) + 1}`,
+              joined_at: new Date().toISOString()
+            });
+
+          if (participantError) {
+            console.error('❌ Direct database join failed:', participantError);
+            throw participantError;
+          }
+
+          // Update participant count
+          await supabase
+            .from('blinddate_sessions')
+            .update({ participant_count: sessionData.participant_count + 1 })
+            .eq('id', sessionData.id);
+
+          console.log('✅ Direct database join successful!');
+          
+          // Format the response to match Edge Function format
+          const gameSessionData = {
+            sessionId: sessionData.id,
+            status: sessionData.status,
+            inviteCode: sessionData.invite_code,
+            role: 'participant',
+            avatarName: `Avatar${Math.floor(Math.random() * 10) + 1}`,
+            participant_count: sessionData.participant_count + 1,
+            session: {
+              id: sessionData.id,
+              status: sessionData.status,
+              is_private: true,
+              invite_code: sessionData.invite_code
+            },
+            participants: [
+              ...sessionData.blinddate_participants.map(p => ({
+                session_id: p.session_id,
+                user_id: p.user_id,
+                role: p.role,
+                avatar_name: p.avatar_name,
+                is_me: p.user_id === user.id
+              })),
+              {
+                session_id: sessionData.id,
+                user_id: user.id,
+                role: 'participant',
+                avatar_name: `Avatar${Math.floor(Math.random() * 10) + 1}`,
+                is_me: true
+              }
+            ]
+          };
+
+          setSessionData(gameSessionData);
+          
+          if (gameSessionData.status === 'active') {
+            setMatchState('found');
+          } else {
+            setMatchState('waiting');
+          }
+          
+          console.log('✅ Direct database join fallback successful - joining room');
+          onGameStarted(gameSessionData);
+          return; // Exit early on successful fallback
+
+        } catch (fallbackError: any) {
+          console.error('❌ Direct database join fallback also failed:', fallbackError);
+          if (!userMessage.includes('Invalid') && !userMessage.includes('full')) {
+            userMessage = 'Both server and database attempts failed. Please try again later.';
+          }
+        }
+      } else if (error.message.includes('auth') || error.message.includes('unauthorized') || error.message.includes('JWT')) {
+        userMessage = 'Authentication failed. Please sign in again.';
+        console.error('🔐 JOIN AUTH ERROR:', { 
+          invite_code: code,
+          possible_causes: ['Expired session', 'Invalid JWT', 'Missing auth header']
+        });
+      } else if (error.message.includes('not found') || error.message.includes('invalid') || error.code === 'PGRST116') {
+        userMessage = 'Invalid or expired invite code. Please check the code and try again.';
+        console.error('🔍 INVALID CODE ERROR:', { 
+          invite_code: code,
+          possible_causes: ['Room no longer exists', 'Typo in code', 'Room already full']
+        });
+      } else if (error.message.includes('full') || error.message.includes('capacity')) {
+        userMessage = 'This room is full. Please ask for a new invite code.';
+        console.error('🚫 ROOM FULL ERROR:', { 
+          invite_code: code,
+          possible_causes: ['Room already has 2 participants', 'Concurrent join attempts']
+        });
       }
+      
+      // Additional debugging info
+      console.error('🔍 JOIN DEBUGGING INFO:', {
+        current_state: matchState,
+        invite_code_length: code?.length,
+        invite_code_format: /^[A-Z0-9]{6}$/.test(code) ? 'valid_format' : 'invalid_format',
+        environment: import.meta.env.MODE
+      });
+      
+      onError(userMessage);
+      setMatchState('idle');
     }
   }, [user, onGameStarted, onError]);
 
@@ -559,7 +744,7 @@ const MatchmakingWithTimeout: React.FC<MatchmakingWithTimeoutProps> = ({
             isPrivate: true 
           },
           headers: {
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            Authorization: `Bearer ${getAccessToken()}`
           }
         });
 

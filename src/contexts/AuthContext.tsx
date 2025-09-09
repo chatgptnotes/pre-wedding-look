@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { storeTokens, getTokens, clearTokens, isTokenExpired, debugTokens } from '../utils/tokenStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -47,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Get initial session
+    // Get initial session with cookie restoration
     const initializeAuth = async () => {
       try {
         if (!supabase) {
@@ -58,10 +59,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         
+        console.log('🚀 Initializing authentication...');
+        
+        // First try to restore session from cookies
+        const cookieTokens = getTokens();
+        if (cookieTokens && !isTokenExpired()) {
+          console.log('✅ Found valid tokens in cookies, restoring session');
+          debugTokens();
+          
+          // Set the session from cookies without waiting for Supabase
+          if (mounted) {
+            setUser({ id: cookieTokens.userId } as User); // Minimal user object
+            setLoading(false);
+          }
+          return;
+        } else if (cookieTokens && isTokenExpired()) {
+          console.log('⏰ Tokens in cookies are expired, clearing them');
+          clearTokens();
+        } else {
+          console.log('ℹ️ No valid tokens found in cookies');
+        }
+        
+        // Fallback to Supabase session check
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
+        }
+
+        if (session) {
+          console.log('✅ Found valid Supabase session, storing in cookies');
+          storeSessionInCookies(session);
         }
 
         if (mounted) {
@@ -101,6 +129,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setLoading(false);
+
+        // Store session in cookies when signed in
+        if (event === 'SIGNED_IN' && session) {
+          storeSessionInCookies(session);
+        }
 
         // Create or update user profile when user signs up or signs in
         if (event === 'SIGNED_IN' && session?.user && supabase) {
@@ -165,7 +198,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    // Store session in cookies if available after sign up  
+    if (data.session) {
+      storeSessionInCookies(data.session);
+      setSession(data.session);
+      setUser(data.session.user);
+    }
+
     return { error };
+  };
+
+  // Helper function to store session in cookies
+  const storeSessionInCookies = (session: Session) => {
+    try {
+      if (session.access_token && session.refresh_token && session.user?.id) {
+        const tokenData = {
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          userId: session.user.id,
+          expiresAt: session.expires_at || Math.floor(Date.now() / 1000) + 3600, // Default 1 hour if not provided
+        };
+        
+        storeTokens(tokenData);
+        console.log('✅ Session stored in cookies successfully');
+      }
+    } catch (error) {
+      console.error('❌ Failed to store session in cookies:', error);
+    }
   };
 
   const signIn = async (email: string, password: string) => {
@@ -186,6 +245,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log('Sign in successful:', data);
+      
+      // Store session in cookies immediately after successful sign in
+      if (data.session) {
+        storeSessionInCookies(data.session);
+        // Also update the context state
+        setSession(data.session);
+        setUser(data.session.user);
+      }
+      
       return { error: null };
     } catch (err) {
       console.error('Sign in exception:', err);
@@ -210,15 +278,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      console.log('🚪 Signing out user...');
+      
       if (supabase && !bypassAuth) {
         const { error } = await supabase.auth.signOut();
         if (error) {
           console.error('Supabase sign out error:', error);
         }
       }
+      
+      // Clear tokens from cookies
+      clearTokens();
+      
       // Clear state manually in case auth state change doesn't trigger
       setUser(null);
       setSession(null);
+      
+      console.log('✅ User signed out successfully');
       setLoading(false);
     } catch (error) {
       console.error('Sign out error:', error);
