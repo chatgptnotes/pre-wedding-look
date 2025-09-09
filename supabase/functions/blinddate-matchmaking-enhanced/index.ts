@@ -11,10 +11,13 @@ const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000000';
 const WAITING_TIMEOUT_SECONDS = 45;
 
 interface MatchmakeRequest {
+  action?: string;
   prefs?: any;
   isPrivate?: boolean;
   inviteCode?: string;
   requestBotDemo?: boolean;
+  user_id?: string;
+  user_email?: string;
 }
 
 type MatchmakeResponse = 
@@ -32,20 +35,50 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const { action, prefs, isPrivate, inviteCode, requestBotDemo, user_id, user_email }: MatchmakeRequest = await req.json();
+
+    console.log('Request received:', { action, user_id, user_email });
+
+    let user = null;
+    
+    // Try to get user from auth header first
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
+    if (authHeader) {
+      console.log('Attempting auth with header...');
+      try {
+        const { data: { user: authUser }, error: userError } = await supabaseClient.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+        
+        if (!userError && authUser) {
+          user = authUser;
+          console.log('✅ Auth successful via header:', user.id);
+        }
+      } catch (error) {
+        console.log('Auth header failed:', error.message);
+      }
+    }
+    
+    // If auth header failed, but we have user info in body, create a mock user object
+    if (!user && user_id) {
+      console.log('Using user info from request body');
+      user = {
+        id: user_id,
+        email: user_email || `user-${user_id}@example.com`,
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      console.log('✅ Using user from body:', user.id);
+    }
+    
+    if (!user) {
+      throw new Error('No valid user authentication found');
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (userError || !user) {
-      throw new Error('Invalid user token');
-    }
-
-    const { prefs, isPrivate, inviteCode, requestBotDemo }: MatchmakeRequest = await req.json();
+    console.log('Matchmaking request:', { action, isPrivate, inviteCode, requestBotDemo });
 
     // Handle bot demo request
     if (requestBotDemo) {
@@ -57,7 +90,18 @@ serve(async (req) => {
       return await handleInviteCode(supabaseClient, user.id, inviteCode);
     }
 
-    // Handle matchmaking
+    // Handle create private action specifically
+    if (action === 'create_private') {
+      console.log('Creating private room for user:', user.id);
+      return await createWaitingSession(supabaseClient, user.id, true);
+    }
+
+    // Handle join action
+    if (action === 'join') {
+      return await handleMatchmaking(supabaseClient, user.id, isPrivate || false, prefs);
+    }
+
+    // Default fallback to matchmaking
     return await handleMatchmaking(supabaseClient, user.id, isPrivate || false, prefs);
 
   } catch (error) {

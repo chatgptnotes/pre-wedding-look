@@ -77,13 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Reduce timeout to prevent navigation loops and add mounted check
+    // Set reasonable timeout for auth initialization
     const fallbackTimeout = setTimeout(() => {
       if (mounted && loading) {
         console.warn('Auth initialization taking too long, proceeding without auth');
         setLoading(false);
       }
-    }, 2000); // Reduced from 5000 to 2000ms
+    }, 10000); // Increased to 10 seconds for more reliable auth
 
     initializeAuth();
 

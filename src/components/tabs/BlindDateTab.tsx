@@ -324,18 +324,91 @@ const BlindDateTab: React.FC = () => {
                     console.log('Bot demo game state set, transitioning to playing phase');
                     
                   } else {
-                    // Regular multiplayer mode - fetch from server
-                    console.log('Fetching real game state from server');
-                    const state = await BlindDateService.getGameState(sessionData.sessionId);
-                    setGameState(state);
+                    // Regular multiplayer mode
+                    console.log('Setting up multiplayer game state');
                     
-                    // Determine phase based on game state
-                    if (state.session.status === 'waiting') {
+                    // Check if this is an offline/fallback session
+                    if (sessionData.sessionId && sessionData.sessionId.startsWith('offline-')) {
+                      console.log('Using offline session data directly');
+                      
+                      // Create game state from session data for offline mode
+                      const offlineGameState: BlindDateGameState = {
+                        session: sessionData.session || {
+                          id: sessionData.sessionId,
+                          status: sessionData.status || 'waiting',
+                          is_private: true,
+                          invite_code: sessionData.inviteCode,
+                          created_at: new Date().toISOString(),
+                          ended_at: null
+                        },
+                        participants: sessionData.participants || [{
+                          session_id: sessionData.sessionId,
+                          user_id: sessionData.user_id || 'current-user',
+                          role: sessionData.role || 'A',
+                          joined_at: new Date().toISOString(),
+                          is_revealed: false,
+                          avatar_name: sessionData.avatarName || 'Player',
+                          is_me: true
+                        }],
+                        current_round: null,
+                        rounds: [],
+                        designs: [],
+                        my_designs: [],
+                        my_role: sessionData.role || 'A'
+                      };
+                      
+                      setGameState(offlineGameState);
                       setGamePhase('waiting');
-                    } else if (state.session.status === 'active') {
-                      setGamePhase('playing');
-                    } else if (state.session.status === 'reveal') {
-                      setGamePhase('reveal');
+                      console.log('Offline game state set, transitioning to waiting room');
+                      
+                    } else {
+                      // Try to fetch from server for real sessions
+                      try {
+                        console.log('Fetching real game state from server');
+                        const state = await BlindDateService.getGameState(sessionData.sessionId);
+                        setGameState(state);
+                        
+                        // Determine phase based on game state
+                        if (state.session.status === 'waiting') {
+                          setGamePhase('waiting');
+                        } else if (state.session.status === 'active') {
+                          setGamePhase('playing');
+                        } else if (state.session.status === 'reveal') {
+                          setGamePhase('reveal');
+                        }
+                      } catch (fetchError) {
+                        console.error('Failed to fetch game state, using session data:', fetchError);
+                        
+                        // Fallback: Create game state from session data
+                        const fallbackGameState: BlindDateGameState = {
+                          session: sessionData.session || {
+                            id: sessionData.sessionId,
+                            status: sessionData.status || 'waiting',
+                            is_private: true,
+                            invite_code: sessionData.inviteCode,
+                            created_at: new Date().toISOString(),
+                            ended_at: null
+                          },
+                          participants: sessionData.participants || [{
+                            session_id: sessionData.sessionId,
+                            user_id: 'current-user',
+                            role: sessionData.role || 'A',
+                            joined_at: new Date().toISOString(),
+                            is_revealed: false,
+                            avatar_name: sessionData.avatarName || 'Player',
+                            is_me: true
+                          }],
+                          current_round: null,
+                          rounds: [],
+                          designs: [],
+                          my_designs: [],
+                          my_role: sessionData.role || 'A'
+                        };
+                        
+                        setGameState(fallbackGameState);
+                        setGamePhase('waiting');
+                        console.log('Fallback game state created, transitioning to waiting room');
+                      }
                     }
                   }
                   

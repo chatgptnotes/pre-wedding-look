@@ -16,30 +16,67 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ gameState, onLeaveGame }) => 
   const myParticipant = gameState.participants.find(p => p.is_me);
   const otherParticipant = gameState.participants.find(p => !p.is_me);
 
+  const getInviteUrl = () => {
+    return `${window.location.origin}${window.location.pathname}?invite=${inviteCode}`;
+  };
+
   const copyInviteCode = async () => {
     if (inviteCode) {
       try {
         await navigator.clipboard.writeText(inviteCode);
         // Could add a toast notification here
+        console.log('Invite code copied to clipboard');
       } catch (err) {
         console.error('Failed to copy invite code:', err);
       }
     }
   };
 
+  const copyInviteLink = async () => {
+    if (inviteCode) {
+      try {
+        const inviteUrl = getInviteUrl();
+        await navigator.clipboard.writeText(inviteUrl);
+        console.log('Invite link copied to clipboard:', inviteUrl);
+      } catch (err) {
+        console.error('Failed to copy invite link:', err);
+      }
+    }
+  };
+
   const shareInviteCode = () => {
     if (inviteCode) {
-      const text = `🎭 Join my Blind Date Style-Off game! Use invite code: ${inviteCode}\n\nhttps://your-app-url.com/blinddate?code=${inviteCode}`;
+      const inviteUrl = getInviteUrl();
+      const text = `🎭 Join my Blind Date Style-Off game!\n\nClick here to join: ${inviteUrl}\n\nOr use invite code: ${inviteCode}`;
       
       if (navigator.share) {
         navigator.share({
           title: 'Blind Date Style-Off Invite',
           text: text,
+          url: inviteUrl
         });
       } else {
-        // Fallback to copying
-        copyInviteCode();
+        // Fallback to copying the full link
+        copyInviteLink();
       }
+    }
+  };
+
+  const shareToWhatsApp = () => {
+    if (inviteCode) {
+      const inviteUrl = getInviteUrl();
+      const message = `🎭 Join my Blind Date Style-Off game!\n\nClick here: ${inviteUrl}\n\nOr use code: ${inviteCode}`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    }
+  };
+
+  const shareToMessages = () => {
+    if (inviteCode) {
+      const inviteUrl = getInviteUrl();
+      const message = `🎭 Join my Blind Date Style-Off game!\n\nClick here: ${inviteUrl}\n\nOr use code: ${inviteCode}`;
+      const smsUrl = `sms:?&body=${encodeURIComponent(message)}`;
+      window.open(smsUrl);
     }
   };
 
@@ -154,19 +191,52 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ gameState, onLeaveGame }) => 
                 </p>
               </div>
 
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={copyInviteCode}
-                  className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
-                >
-                  📋 Copy Code
-                </button>
-                <button
-                  onClick={shareInviteCode}
-                  className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
-                >
-                  📤 Share
-                </button>
+              <div className="space-y-3">
+                {/* Primary sharing options */}
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={copyInviteLink}
+                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl transition-colors flex items-center gap-2 font-medium"
+                  >
+                    🔗 Copy Link
+                  </button>
+                  <button
+                    onClick={shareInviteCode}
+                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl transition-colors flex items-center gap-2 font-medium"
+                  >
+                    📤 Share
+                  </button>
+                </div>
+                
+                {/* Social media sharing */}
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={shareToWhatsApp}
+                    className="bg-green-500/80 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
+                  >
+                    💬 WhatsApp
+                  </button>
+                  <button
+                    onClick={shareToMessages}
+                    className="bg-blue-500/80 hover:bg-blue-500 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
+                  >
+                    💬 Messages
+                  </button>
+                  <button
+                    onClick={copyInviteCode}
+                    className="bg-gray-500/80 hover:bg-gray-500 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
+                  >
+                    📋 Code Only
+                  </button>
+                </div>
+                
+                {/* Invite URL display */}
+                <div className="bg-white/10 rounded-xl p-3 mt-4">
+                  <p className="text-xs opacity-75 mb-1">Direct link to share:</p>
+                  <p className="text-xs font-mono break-all opacity-90">
+                    {getInviteUrl()}
+                  </p>
+                </div>
               </div>
             </div>
           </motion.div>
