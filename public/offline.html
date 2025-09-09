@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Style-Off</title>
+    <meta name="description" content="You're offline. Some features may be limited.">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-128x128.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .offline-container {
+            text-align: center;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .retry-button {
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-right: 10px;
+        }
+        
+        .retry-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.3);
+        }
+        
+        .home-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .home-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .features-list {
+            text-align: left;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .features-list h3 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .features-list ul {
+            list-style: none;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .features-list li {
+            padding: 5px 0;
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .features-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        .network-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+        
+        .network-status.online {
+            background: rgba(34, 197, 94, 0.9);
+        }
+        
+        @media (max-width: 480px) {
+            .offline-container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            p {
+                font-size: 1rem;
+            }
+            
+            .retry-button, .home-button {
+                display: block;
+                width: 100%;
+                margin: 10px 0;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="network-status" id="networkStatus">
+        🔴 Offline
+    </div>
+    
+    <div class="offline-container">
+        <div class="offline-icon">
+            📵
+        </div>
+        
+        <h1>You're Offline</h1>
+        <p>Don't worry! You can still use some features of Style-Off while offline. We'll sync your progress when you're back online.</p>
+        
+        <button class="retry-button" onclick="retry()">
+            Try Again
+        </button>
+        
+        <a href="/" class="home-button">
+            Go Home
+        </a>
+        
+        <div class="features-list">
+            <h3>Available Offline:</h3>
+            <ul>
+                <li>View your cached photos</li>
+                <li>Browse saved game results</li>
+                <li>Continue photo editing</li>
+                <li>Access your gallery</li>
+                <li>View app settings</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // Check network status
+        function updateNetworkStatus() {
+            const statusEl = document.getElementById('networkStatus');
+            if (navigator.onLine) {
+                statusEl.textContent = '🟢 Online';
+                statusEl.className = 'network-status online';
+            } else {
+                statusEl.textContent = '🔴 Offline';
+                statusEl.className = 'network-status';
+            }
+        }
+        
+        // Retry connection
+        function retry() {
+            if (navigator.onLine) {
+                // Try to reload the page
+                window.location.reload();
+            } else {
+                // Show message that we're still offline
+                const retryBtn = document.querySelector('.retry-button');
+                const originalText = retryBtn.textContent;
+                retryBtn.textContent = 'Still Offline...';
+                retryBtn.style.background = 'rgba(239, 68, 68, 0.8)';
+                
+                setTimeout(() => {
+                    retryBtn.textContent = originalText;
+                    retryBtn.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)';
+                }, 2000);
+            }
+        }
+        
+        // Listen for network changes
+        window.addEventListener('online', () => {
+            updateNetworkStatus();
+            // Automatically retry when back online
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+        
+        window.addEventListener('offline', updateNetworkStatus);
+        
+        // Initial status check
+        updateNetworkStatus();
+        
+        // Service Worker message handling
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data.type === 'NETWORK_STATUS') {
+                    updateNetworkStatus();
+                }
+            });
+        }
+        
+        // Auto-retry every 30 seconds
+        setInterval(() => {
+            if (navigator.onLine) {
+                window.location.reload();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
