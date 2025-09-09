@@ -145,7 +145,7 @@ async function handleJoinGame(supabaseClient: any, userId: string, inviteCode?: 
       // Join existing waiting session
       session = waitingSessions[0];
     } else {
-      // Create new session
+      // No matches found - create new session and enter waiting mode
       const { data: newSession, error } = await supabaseClient
         .from('blinddate_sessions')
         .insert({
@@ -212,7 +212,9 @@ async function handleJoinGame(supabaseClient: any, userId: string, inviteCode?: 
       role,
       avatar_name: avatarName,
       status: allParticipants?.length === 2 ? 'active' : 'waiting',
-      participant_count: allParticipants?.length || 1
+      participant_count: allParticipants?.length || 1,
+      is_new_session: !waitingSessions || waitingSessions.length === 0,
+      match_type: inviteCode ? 'private' : (waitingSessions && waitingSessions.length > 0 ? 'found_match' : 'no_match_waiting')
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
