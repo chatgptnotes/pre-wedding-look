@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ClaudeCodeProvider } from './contexts/ClaudeCodeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import LandingPageEnhanced from './components/LandingPageEnhanced';
@@ -11,6 +12,7 @@ import ImageUploader from './components/ImageUploader';
 import MagicCreation from './components/MagicCreation';
 import FavoritesModal from './components/FavoritesModal';
 import ComparisonModal from './components/ComparisonModal';
+import ClaudeCodeSettingsModal from './components/ClaudeCodeSettingsModal';
 // New Tab Components
 import StoryboardTab from './components/tabs/StoryboardTab';
 import FusionRealityTab from './components/tabs/FusionRealityTab';
@@ -83,6 +85,7 @@ const AppContent: React.FC = () => {
   const [showFavorites, setShowFavorites] = useState<boolean>(false);
   const [showComparison, setShowComparison] = useState<boolean>(false);
   const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
+  const [showClaudeCodeSettings, setShowClaudeCodeSettings] = useState<boolean>(false);
 
   const handleConfigChange = useCallback((key: keyof GenerationConfig, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -299,7 +302,8 @@ const AppContent: React.FC = () => {
 
         <Header 
           onShowFavorites={() => setShowFavorites(true)} 
-          onShowComparison={() => setShowComparison(true)} 
+          onShowComparison={() => setShowComparison(true)}
+          onShowClaudeCodeSettings={() => setShowClaudeCodeSettings(true)}
         />
         <main className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-7xl mx-auto space-y-8">
@@ -473,6 +477,12 @@ const AppContent: React.FC = () => {
           onClose={() => setShowComparison(false)}
           initialImages={comparisonItems}
         />
+
+        {/* Claude Code Settings Modal */}
+        <ClaudeCodeSettingsModal
+          isOpen={showClaudeCodeSettings}
+          onClose={() => setShowClaudeCodeSettings(false)}
+        />
       </div>
     );
   }
@@ -482,7 +492,8 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-rose-50/50 via-pink-50/30 to-purple-50/50">
       <Header 
         onShowFavorites={() => setShowFavorites(true)} 
-        onShowComparison={() => setShowComparison(true)} 
+        onShowComparison={() => setShowComparison(true)}
+        onShowClaudeCodeSettings={() => setShowClaudeCodeSettings(true)}
       />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 sm:gap-8 max-w-7xl mx-auto">
@@ -749,6 +760,12 @@ const AppContent: React.FC = () => {
         onClose={() => setShowComparison(false)}
         initialImages={comparisonItems}
       />
+
+      {/* Claude Code Settings Modal */}
+      <ClaudeCodeSettingsModal
+        isOpen={showClaudeCodeSettings}
+        onClose={() => setShowClaudeCodeSettings(false)}
+      />
     </div>
   );
 };
@@ -757,7 +774,9 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <ClaudeCodeProvider>
+          <AppContent />
+        </ClaudeCodeProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
