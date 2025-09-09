@@ -35,3 +35,4 @@ dist-ssr
 *.key
 secrets.json
 .vercel
+.trees/
