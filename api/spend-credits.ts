@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase
@@ -17,7 +17,7 @@ interface SpendCreditsRequest {
  * Spend Credits API Endpoint
  * Deducts credits from user's wallet for reel generation
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method Not Allowed' });

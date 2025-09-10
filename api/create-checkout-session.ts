@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { createOrUpdateStripeCustomer } from './stripe-webhook';
@@ -25,7 +25,7 @@ interface CreateCheckoutSessionRequest {
 /**
  * Create Stripe Checkout Session API Endpoint
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -165,11 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// Configuration for Next.js API routes
+// Configuration for Vercel Node.js runtime
 export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
-  },
+  maxDuration: 30,
 };

@@ -1,5 +1,4 @@
 import { ImageResponse } from '@vercel/og';
-import { NextRequest } from 'next/server';
 
 export const config = {
   runtime: 'edge',
@@ -218,7 +217,7 @@ const getDefaultTemplate = (type: string, data: any) => {
   }
 };
 
-export default async function handler(req: NextRequest) {
+export default async function handler(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     
@@ -256,15 +255,8 @@ export default async function handler(req: NextRequest) {
         width,
         height,
         // You can add custom fonts here
-        fonts: [
-          {
-            name: 'Inter',
-            data: await fetch(
-              new URL('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', import.meta.url)
-            ).then((res) => res.arrayBuffer()),
-            style: 'normal',
-          },
-        ],
+        // Note: Font loading removed for Vercel edge runtime compatibility
+        // Custom fonts can be added if needed by including them as base64 or static assets
       }
     );
   } catch (error) {

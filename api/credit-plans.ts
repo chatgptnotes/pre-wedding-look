@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase
@@ -11,7 +11,7 @@ const supabase = createClient(
  * Get Credit Plans API Endpoint
  * Returns available credit plans for purchase
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method Not Allowed' });

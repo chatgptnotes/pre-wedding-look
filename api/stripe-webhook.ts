@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -20,7 +20,7 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
  * Stripe Webhook Handler
  * Processes Stripe events, specifically payment completions
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method Not Allowed' });

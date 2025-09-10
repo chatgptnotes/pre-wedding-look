@@ -254,7 +254,8 @@ const AppContent: React.FC = () => {
       'voice-slideshow': 'voice-slideshow',
       'magic-button': 'magic-button',
       'regional-styles': 'regional-styles',
-      'beyond-pre-wedding': 'beyond-pre-wedding'
+      'beyond-pre-wedding': 'beyond-pre-wedding',
+      'blind-date': 'blind-date'
     };
     
     const tabId = tabMapping[modeId] || 'classic';
