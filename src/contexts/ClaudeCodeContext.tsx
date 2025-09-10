@@ -39,22 +39,41 @@ export function ClaudeCodeProvider({ children }: ClaudeCodeProviderProps): JSX.E
     try {
       setIsLoading(true);
       
-      // Initialize services
-      SlashCommandService.initialize();
-      await ClaudeCodeConfigService.initialize(user?.id);
+      // Initialize services with timeout protection
+      try {
+        SlashCommandService.initialize();
+      } catch (error) {
+        console.warn('SlashCommandService initialization failed:', error);
+      }
       
-      // Subscribe to config changes
-      const unsubscribe = ClaudeCodeConfigService.subscribe((newConfig) => {
-        setConfig(newConfig);
-      });
+      try {
+        // Add timeout protection for database operations
+        const configPromise = ClaudeCodeConfigService.initialize(user?.id);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Config initialization timeout')), 5000)
+        );
+        
+        await Promise.race([configPromise, timeoutPromise]);
+        
+        // Subscribe to config changes
+        const unsubscribe = ClaudeCodeConfigService.subscribe((newConfig) => {
+          setConfig(newConfig);
+        });
 
-      // Load initial config
-      const initialConfig = ClaudeCodeConfigService.getConfig();
-      setConfig(initialConfig);
+        // Load initial config
+        const initialConfig = ClaudeCodeConfigService.getConfig();
+        setConfig(initialConfig);
 
-      return unsubscribe;
+        return unsubscribe;
+      } catch (error) {
+        console.warn('ClaudeCodeConfigService initialization failed:', error);
+        // Use default config if initialization fails
+        setConfig(() => ClaudeCodeConfigService.getConfig());
+      }
     } catch (error) {
       console.error('Failed to initialize Claude Code:', error);
+      // Ensure default config is set even on failure
+      setConfig(() => ClaudeCodeConfigService.getConfig());
     } finally {
       setIsLoading(false);
     }

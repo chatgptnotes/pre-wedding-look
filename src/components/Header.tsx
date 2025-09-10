@@ -50,8 +50,12 @@ const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison, onSh
             {/* Feature Navigation Buttons */}
             {onShowFavorites && (
               <button
-                onClick={onShowFavorites}
-                className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowFavorites();
+                }}
+                className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center cursor-pointer"
                 title="My Favorites"
               >
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,8 +67,12 @@ const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison, onSh
             
             {onShowComparison && (
               <button
-                onClick={onShowComparison}
-                className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowComparison();
+                }}
+                className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center cursor-pointer"
                 title="Compare Looks"
               >
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,12 +85,16 @@ const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison, onSh
             {/* Claude Code Settings Button */}
             {onShowClaudeCodeSettings && (
               <button
-                onClick={onShowClaudeCodeSettings}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowClaudeCodeSettings();
+                }}
                 className={`${
                   isEnabled 
                     ? 'bg-green-500/20 hover:bg-green-500/30 border border-green-400/50' 
                     : 'bg-white/20 hover:bg-white/30'
-                } text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center`}
+                } text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center cursor-pointer`}
                 title="Claude Code Settings"
               >
                 <span className="text-base mr-1">{isEnabled ? '🟢' : '⚪'}</span>
@@ -98,8 +110,12 @@ const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison, onSh
                   <>
                     <UserProfile />
                     <button
-                      onClick={handleSignOut}
-                      className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSignOut();
+                      }}
+                      className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 cursor-pointer"
                     >
                       Sign Out
                     </button>

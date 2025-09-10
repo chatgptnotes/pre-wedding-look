@@ -326,8 +326,12 @@ const AppContent: React.FC = () => {
                     <p className="text-gray-600">Traditional step-by-step pre-wedding photo creation</p>
                   </div>
                   <button
-                    onClick={() => setStage('bride')}
-                    className="w-full bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold py-4 px-8 rounded-lg hover:from-rose-700 hover:to-pink-700 transition-all duration-300"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStage('bride');
+                    }}
+                    className="w-full bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold py-4 px-8 rounded-lg hover:from-rose-700 hover:to-pink-700 transition-all duration-300 cursor-pointer"
                   >
                     Start Classic Mode
                   </button>
@@ -415,7 +419,9 @@ const AppContent: React.FC = () => {
           {AuthService.isAdmin(user) && (
             <div className="relative group">
               <button
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
                   try {
                     AuthService.requireAdmin(user);
                     window.location.hash = '#admin';
@@ -424,7 +430,7 @@ const AppContent: React.FC = () => {
                     alert('Access denied. Admin privileges required.');
                   }
                 }}
-                className="group bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 backdrop-blur-sm border border-white/20 relative min-w-[60px] min-h-[60px] flex items-center justify-center"
+                className="group bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 backdrop-blur-sm border border-white/20 relative min-w-[60px] min-h-[60px] flex items-center justify-center cursor-pointer"
                 title={`Admin Dashboard - ${AuthService.getUserDisplayInfo(user).roleLabel}`}
               >
                 {/* Role indicator badge - repositioned to avoid overlap */}
@@ -448,8 +454,12 @@ const AppContent: React.FC = () => {
           {/* Home Button */}
           <div className="relative group">
             <button
-              onClick={() => setStage('landing')}
-              className="bg-white/90 backdrop-blur-xl text-slate-700 hover:text-indigo-600 p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-white/50 min-w-[60px] min-h-[60px] flex items-center justify-center"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setStage('landing');
+              }}
+              className="bg-white/90 backdrop-blur-xl text-slate-700 hover:text-indigo-600 p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-white/50 min-w-[60px] min-h-[60px] flex items-center justify-center cursor-pointer"
               title="Back to Home"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -762,11 +772,7 @@ const AppContent: React.FC = () => {
         initialImages={comparisonItems}
       />
 
-      {/* Claude Code Settings Modal */}
-      <ClaudeCodeSettingsModal
-        isOpen={showClaudeCodeSettings}
-        onClose={() => setShowClaudeCodeSettings(false)}
-      />
+      {/* Claude Code Settings Modal - REMOVED DUPLICATE */}
     </div>
   );
 };

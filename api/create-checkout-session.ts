@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 // Initialize Supabase
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const customerId = await createOrUpdateStripeCustomer(user.id, customerEmail);
 
     // Default URLs
-    const domain = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const domain = process.env.VITE_SITE_URL || 'http://localhost:3000';
     const defaultSuccessUrl = `${domain}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
     const defaultCancelUrl = `${domain}/payment-cancelled`;
 

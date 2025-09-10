@@ -122,11 +122,15 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange, c
           return (
             <motion.button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTabChange(tab.id);
+              }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className={`group relative p-4 rounded-2xl text-center transition-all duration-500 ${
+              className={`group relative p-4 rounded-2xl text-center transition-all duration-500 cursor-pointer ${
                 isActive
                   ? 'bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white shadow-2xl shadow-purple-500/25 transform scale-105'
                   : 'bg-slate-50/70 hover:bg-white/80 text-slate-700 hover:text-indigo-600 hover:shadow-lg'

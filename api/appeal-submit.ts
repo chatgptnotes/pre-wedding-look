@@ -1,58 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { moderationService } from '@/services/moderationService';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(req: NextRequest) {
+// Initialize Supabase
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    return handleGetAppeals(req, res);
+  }
+
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['GET', 'POST']);
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  return handleSubmitAppeal(req, res);
+}
+
+async function handleSubmitAppeal(req: VercelRequest, res: VercelResponse) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Get authenticated user
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
     }
 
-    const body = await req.json();
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const {
       moderationActionId,
       appealText,
       evidenceUrls = []
-    } = body;
+    } = req.body;
 
     // Validate required fields
     if (!moderationActionId || !appealText) {
-      return NextResponse.json(
-        { error: 'Missing required fields: moderationActionId, appealText' },
-        { status: 400 }
-      );
+      return res.status(400).json({
+        error: 'Missing required fields: moderationActionId, appealText'
+      });
     }
 
     // Validate appeal text length (minimum 50 characters, maximum 2000)
     if (appealText.length < 50) {
-      return NextResponse.json(
-        { error: 'Appeal text must be at least 50 characters long' },
-        { status: 400 }
-      );
+      return res.status(400).json({
+        error: 'Appeal text must be at least 50 characters long'
+      });
     }
 
     if (appealText.length > 2000) {
-      return NextResponse.json(
-        { error: 'Appeal text must not exceed 2000 characters' },
-        { status: 400 }
-      );
+      return res.status(400).json({
+        error: 'Appeal text must not exceed 2000 characters'
+      });
     }
 
     // Validate evidence URLs (max 5 URLs)
     if (evidenceUrls.length > 5) {
-      return NextResponse.json(
-        { error: 'Maximum 5 evidence URLs allowed' },
-        { status: 400 }
-      );
+      return res.status(400).json({
+        error: 'Maximum 5 evidence URLs allowed'
+      });
     }
 
     // Validate URL format for evidence URLs
@@ -60,10 +73,9 @@ export async function POST(req: NextRequest) {
       try {
         new URL(url);
       } catch {
-        return NextResponse.json(
-          { error: 'Invalid evidence URL format' },
-          { status: 400 }
-        );
+        return res.status(400).json({
+          error: 'Invalid evidence URL format'
+        });
       }
     }
 
@@ -75,18 +87,15 @@ export async function POST(req: NextRequest) {
         action_type,
         reason,
         public_reason,
-        created_at,
-        content_moderation_results!inner(user_id)
+        created_at
       `)
       .eq('id', moderationActionId)
-      .eq('content_moderation_results.user_id', user.id)
       .single();
 
     if (actionError || !moderationAction) {
-      return NextResponse.json(
-        { error: 'Moderation action not found or access denied' },
-        { status: 404 }
-      );
+      return res.status(404).json({
+        error: 'Moderation action not found or access denied'
+      });
     }
 
     // Check if user has already submitted an appeal for this action
@@ -102,13 +111,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (existingAppeal) {
-      return NextResponse.json(
-        { 
-          error: 'Appeal already submitted for this action',
-          existing_appeal: existingAppeal
-        },
-        { status: 409 }
-      );
+      return res.status(409).json({
+        error: 'Appeal already submitted for this action',
+        existing_appeal: existingAppeal
+      });
     }
 
     // Rate limiting - max 3 appeals per day per user
@@ -123,19 +129,28 @@ export async function POST(req: NextRequest) {
       console.error('Rate limit check error:', rateLimitError);
       // Continue anyway - don't fail on rate limit check errors
     } else if (recentAppeals && recentAppeals.length >= 3) {
-      return NextResponse.json(
-        { error: 'Daily appeal limit exceeded. Please try again tomorrow.' },
-        { status: 429 }
-      );
+      return res.status(429).json({
+        error: 'Daily appeal limit exceeded. Please try again tomorrow.'
+      });
     }
 
     // Submit the appeal
-    const appeal = await moderationService.submitAppeal(
-      user.id,
-      moderationActionId,
-      appealText,
-      evidenceUrls
-    );
+    const { data: appeal, error: appealError } = await supabase
+      .from('user_appeals')
+      .insert({
+        user_id: user.id,
+        moderation_action_id: moderationActionId,
+        appeal_text: appealText,
+        evidence_urls: evidenceUrls,
+        status: 'pending',
+        submitted_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (appealError) {
+      throw appealError;
+    }
 
     // Log the appeal submission for audit purposes
     await supabase
@@ -151,17 +166,22 @@ export async function POST(req: NextRequest) {
           appeal_text_length: appealText.length,
           evidence_count: evidenceUrls.length
         },
-        ip_address: req.ip,
-        user_agent: req.headers.get('user-agent'),
         risk_score: 0,
         flagged: false
+      })
+      .then(() => {
+        // Success - audit logged
+      })
+      .catch((error) => {
+        console.error('Failed to log audit entry:', error);
+        // Don't fail the main request for audit logging issues
       });
 
     // Send notification to moderation team (in a real app, this might be an email or Slack notification)
     // For now, we'll just log it
     console.log(`New appeal submitted: ${appeal.id} for action: ${moderationActionId}`);
 
-    return NextResponse.json({
+    return res.status(200).json({
       success: true,
       appeal: {
         id: appeal.id,
@@ -174,26 +194,26 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Appeal submission error:', error);
     
-    return NextResponse.json({
+    return res.status(500).json({
       error: 'Failed to submit appeal. Please try again later.',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    });
   }
 }
 
-// Get user's appeals
-export async function GET(req: NextRequest) {
+async function handleGetAppeals(req: VercelRequest, res: VercelResponse) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get authenticated user
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Get user's appeals with related moderation action details
@@ -201,15 +221,11 @@ export async function GET(req: NextRequest) {
       .from('user_appeals')
       .select(`
         *,
-        moderation_actions!inner(
+        moderation_actions(
           action_type,
           reason,
           public_reason,
-          created_at,
-          content_moderation_results!inner(
-            content_type,
-            content_id
-          )
+          created_at
         )
       `)
       .eq('user_id', user.id)
@@ -217,7 +233,7 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({
+    return res.status(200).json({
       success: true,
       appeals: appeals || [],
       count: appeals?.length || 0
@@ -226,9 +242,9 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Get appeals error:', error);
     
-    return NextResponse.json({
+    return res.status(500).json({
       error: 'Failed to fetch appeals',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    });
   }
 }
