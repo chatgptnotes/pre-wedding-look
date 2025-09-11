@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "triggers": {
+    "issues": {
+      "labels": ["claude-code", "ai-coding"],
+      "commands": ["@claude-code", "/claude"]
+    },
+    "comments": {
+      "enabled": true,
+      "allowedUsers": ["all"],
+      "commands": ["@claude-code", "/claude", "/implement", "/fix"]
+    }
+  },
+  "permissions": {
+    "allowedActions": [
+      "create_files",
+      "edit_files",
+      "delete_files",
+      "create_pull_request"
+    ],
+    "protectedPaths": [
+      ".env",
+      ".env.production",
+      "database/",
+      "supabase/config.toml"
+    ]
+  },
+  "codeGeneration": {
+    "language": "typescript",
+    "framework": "react",
+    "style": {
+      "useTailwind": true,
+      "componentStyle": "functional",
+      "importStyle": "named"
+    }
+  },
+  "testing": {
+    "runTests": true,
+    "testCommand": "npm test",
+    "requirePassingTests": false
+  },
+  "review": {
+    "autoAssignReviewers": false,
+    "requireApproval": true
+  }
+}
