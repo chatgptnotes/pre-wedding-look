@@ -14,6 +14,7 @@ permissions:
 jobs:
   process-claude-request:
     runs-on: ubuntu-latest
+    environment: production
     if: |
       (github.event.issue && contains(github.event.issue.labels.*.name, 'claude-code')) ||
       (github.event.comment && contains(github.event.comment.body, '@claude-code'))
@@ -46,6 +47,13 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body || github.event.comment.body }}
         run: |
           echo "Processing Claude Code request from issue #$ISSUE_NUMBER"
+          echo "Checking if CLAUDE_API_KEY is available..."
+          if [ -z "$CLAUDE_API_KEY" ]; then
+            echo "ERROR: CLAUDE_API_KEY is not available. Please check GitHub Secrets."
+            exit 1
+          else
+            echo "CLAUDE_API_KEY is available (length: ${#CLAUDE_API_KEY})"
+          fi
           node .github/scripts/claude-integration.mjs
           
       - name: Create branch for changes
