@@ -40,7 +40,7 @@ jobs:
         id: claude
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          CLAUDE_API_KEY: ${{ vars.CLAUDE_API_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.issue.number }}
           ISSUE_BODY: ${{ github.event.issue.body || github.event.comment.body }}
