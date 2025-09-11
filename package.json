@@ -57,7 +57,9 @@
     "node": "20.x"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.62.0",
     "@lhci/cli": "^0.12.0",
+    "@octokit/rest": "^22.0.0",
     "@playwright/test": "^1.55.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",
