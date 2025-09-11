@@ -46,7 +46,7 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body || github.event.comment.body }}
         run: |
           echo "Processing Claude Code request from issue #$ISSUE_NUMBER"
-          node .github/scripts/claude-integration.js
+          node .github/scripts/claude-integration.mjs
           
       - name: Create branch for changes
         if: success()
