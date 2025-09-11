@@ -21,16 +21,22 @@ async function processClaudeRequest() {
     console.error('ERROR: CLAUDE_API_KEY is not set!');
     process.exit(1);
   }
+  
+  console.log('CLAUDE_API_KEY is set:', claudeApiKey.substring(0, 10) + '...');
 
   // Initialize APIs
   const anthropic = new Anthropic({ apiKey: claudeApiKey });
   const octokit = new Octokit({ auth: githubToken });
 
   try {
+    console.log('Issue body length:', issueBody?.length || 0);
+    console.log('First 200 chars of issue body:', issueBody?.substring(0, 200));
+    
     // Extract the command from the issue body
     const commandMatch = issueBody.match(/@claude-code\s+(.*)/s);
     if (!commandMatch) {
       console.log('No @claude-code command found in issue');
+      console.log('Issue body:', issueBody);
       return;
     }
 
