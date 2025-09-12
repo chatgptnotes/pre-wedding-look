@@ -405,7 +405,10 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
             onClose={() => setShowAuthModal(false)}
             onSuccess={() => {
               setShowAuthModal(false);
+              // Navigate directly to classic mode (bride step)
+              window.location.hash = '';
               onGetStarted();
+              onExploreMode?.('classic');
             }}
           />
         )}

@@ -232,9 +232,9 @@ const AppContent: React.FC = () => {
   }, [config]);
 
   const handleGetStarted = async () => {
-    // Set stage to tabs view instead of bride
-    window.location.hash = '#tabs';
-    setStage('tabs');
+    // Set stage to bride (classic mode) for logged in users
+    window.location.hash = '';
+    setStage('bride');
     
     // Create project in background without blocking the UI
     if (!BYPASS_AUTH && user) {

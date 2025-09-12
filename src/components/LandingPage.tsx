@@ -561,7 +561,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onExploreMode }
 
       <AuthModal 
         isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          setShowAuthModal(false);
+          // Navigate directly to classic mode (bride step)
+          onGetStarted();
+        }}
       />
     </>
   );
