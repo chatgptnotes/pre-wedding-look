@@ -249,7 +249,7 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
                 className="relative"
               >
                 <div className={`bg-gradient-to-r ${mode.color} rounded-3xl p-8 text-white shadow-2xl cursor-pointer transform transition-all duration-300 hover:shadow-3xl`}
-                     onClick={() => handleExploreMode(mode.id)}>
+                     onClick={() => mode.id === 'blind-date' ? setShowWaitlistModal(true) : handleExploreMode(mode.id)}>
                   
                   {/* Badge */}
                   {mode.isNew && (
