@@ -527,7 +527,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onExploreMode }
               </div>
               
               <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
-                Powered by Google Gemini AI • Designed with ❤️ for couples worldwide • 
+                Powered by{' '}
+                <a 
+                  href="https://www.drmhope.com/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-rose-400 hover:text-rose-300 font-medium transition-colors duration-200 underline"
+                >
+                  DrMHope Softwares
+                </a>
+                {' '}• Designed with ❤️ for couples worldwide • 
                 Creating magical moments through cutting-edge AI technology
               </p>
               

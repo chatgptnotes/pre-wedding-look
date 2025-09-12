@@ -991,7 +991,17 @@ const AppContent: React.FC = () => {
         </div>
       </main>
       <footer className="text-center p-4 text-stone-500 text-sm">
-        <p>Powered by Google Gemini. Designed for inspiration.</p>
+        <p>
+          Powered by{' '}
+          <a 
+            href="https://www.drmhope.com/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-purple-600 hover:text-purple-700 font-medium transition-colors duration-200 underline"
+          >
+            DrMHope Softwares
+          </a>
+        </p>
       </footer>
       
       {/* Magic Creation Modal */}
