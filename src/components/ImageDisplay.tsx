@@ -225,113 +225,23 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         )}
       </div>
       
-      {/* Action Buttons Below Image */}
-      {imageUrl && (
+      {/* Action Buttons Below Image - Only Regenerate Button */}
+      {imageUrl && onRegenerateWithSameFace && (
         <div className="flex flex-wrap items-center justify-center gap-3 py-2">
-          {/* Add to Favorites Button */}
-          {!isFavorited && (
-            <button
-              onClick={handleAddToFavorites}
-              disabled={addingToFavorites}
-              className="px-4 py-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white rounded-full shadow-lg transition-all duration-300 flex items-center text-sm font-semibold"
-            >
-              {addingToFavorites ? (
-                <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              )}
-              {addingToFavorites ? 'Adding...' : 'Favorite'}
-            </button>
-          )}
-
-          {/* Save Button */}
-          {!imageSaved ? (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-full shadow-lg transition-all duration-300 flex items-center text-sm font-semibold"
-            >
-              {saving ? (
-                <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-                </svg>
-              )}
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          ) : (
-            <span className="px-4 py-2 bg-green-500 text-white rounded-full shadow-lg flex items-center text-sm font-semibold">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Saved
-            </span>
-          )}
-
           {/* Regenerate with Same Face Button */}
-          {onRegenerateWithSameFace && (
-            <button
-              onClick={onRegenerateWithSameFace}
-              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-full shadow-lg transition-all duration-300 flex items-center text-sm font-semibold"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 20l5-5m0 0H4m5 0v5M20 4l-5 5m0 0V4m0 5h5" />
-              </svg>
-              Regenerate
-            </button>
-          )}
-
-          {/* Share Button */}
           <button
-            onClick={() => setShowSocialShare(true)}
-            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg transition-all duration-300 flex items-center text-sm font-semibold"
+            onClick={onRegenerateWithSameFace}
+            className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-full shadow-lg transition-all duration-300 flex items-center text-sm font-semibold"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 20l5-5m0 0H4m5 0v5M20 4l-5 5m0 0V4m0 5h5" />
             </svg>
-            Share
+            Regenerate
           </button>
 
-          {/* Download Button - Only show if saved */}
-          {imageSaved && (
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-full shadow-lg transition-all duration-300 flex items-center text-sm font-semibold"
-            >
-              {downloading ? (
-                <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              )}
-              {downloading ? 'Downloading...' : 'Download'}
-            </button>
-          )}
         </div>
       )}
 
-      {/* Social Share Modal */}
-      {showSocialShare && shareableImage && (
-        <SocialShare
-          image={shareableImage}
-          isOpen={showSocialShare}
-          onClose={() => setShowSocialShare(false)}
-        />
-      )}
 
     </div>
     

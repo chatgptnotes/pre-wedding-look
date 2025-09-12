@@ -75,16 +75,16 @@ const AppContent: React.FC = () => {
   const [selectedViewImage, setSelectedViewImage] = useState<string | null>(null);
 
   const [config, setConfig] = useState<GenerationConfig>({
-    location: LOCATIONS[1].promptValue,
-    brideAttire: BRIDE_ATTIRE[1].promptValue,
-    groomAttire: GROOM_ATTIRE[1].promptValue,
-    bridePose: BRIDE_POSES[1].promptValue,
-    groomPose: GROOM_POSES[1].promptValue,
-    style: STYLES[0].promptValue,
-    hairstyle: HAIRSTYLES[1].promptValue,
-    groomHairstyle: GROOM_HAIRSTYLES[1].promptValue,
-    aspectRatio: ASPECT_RATIOS[1].promptValue,
-    jewelry: JEWELRY[0].promptValue,
+    location: LOCATIONS[1].promptValue,  // Taj Mahal by default
+    brideAttire: BRIDE_ATTIRE[1].promptValue,  // Red Lehenga by default
+    groomAttire: GROOM_ATTIRE[1].promptValue,  // Classic Sherwani by default
+    bridePose: BRIDE_POSES[1].promptValue,  // Front View by default
+    groomPose: GROOM_POSES[1].promptValue,  // Front View by default
+    style: STYLES[0].promptValue,  // Cinematic by default
+    hairstyle: HAIRSTYLES[1].promptValue,  // Elegant updo by default
+    groomHairstyle: GROOM_HAIRSTYLES[1].promptValue,  // Classic gel by default
+    aspectRatio: ASPECT_RATIOS[1].promptValue,  // Square by default
+    jewelry: JEWELRY[1].promptValue,  // Maharashtrian Nath by default
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
