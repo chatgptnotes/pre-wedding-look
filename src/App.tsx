@@ -439,42 +439,6 @@ const AppContent: React.FC = () => {
         
         {/* Floating Action Buttons - Improved positioning to prevent overlap */}
         <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-50 max-w-[200px]">
-          {/* Admin Access Button (Admin users only) */}
-          {AuthService.isAdmin(user) && (
-            <div className="relative group">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  try {
-                    AuthService.requireAdmin(user);
-                    window.location.hash = '#admin';
-                    setStage('admin');
-                  } catch (error) {
-                    alert('Access denied. Admin privileges required.');
-                  }
-                }}
-                className="group bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white p-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 backdrop-blur-sm border border-white/20 relative min-w-[60px] min-h-[60px] flex items-center justify-center cursor-pointer"
-                title={`Admin Dashboard - ${AuthService.getUserDisplayInfo(user).roleLabel}`}
-              >
-                {/* Role indicator badge - repositioned to avoid overlap */}
-                <div className="absolute -top-2 -left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-2 py-1 rounded-xl shadow-lg whitespace-nowrap">
-                  {AuthService.isSuperAdmin(user) ? '👑 SUPER' : '⚡ ADMIN'}
-                </div>
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-              
-              {/* Tooltip on hover - positioned to avoid viewport overflow */}
-              <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-60">
-                Admin Dashboard
-                <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-slate-900"></div>
-              </div>
-            </div>
-          )}
-
           {/* Home Button */}
           <div className="relative group">
             <button
