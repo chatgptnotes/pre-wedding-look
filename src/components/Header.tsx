@@ -45,22 +45,7 @@ const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison }) =>
           
           <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Feature Navigation Buttons */}
-            {onShowFavorites && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShowFavorites();
-                }}
-                className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center cursor-pointer"
-                title="My Favorites"
-              >
-                <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                <span className="hidden sm:inline">Favorites</span>
-              </button>
-            )}
+            {/* Favorites button hidden as requested */}
             
             {onShowComparison && (
               <button

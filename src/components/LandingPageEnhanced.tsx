@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
+import WaitlistModal from './WaitlistModal';
 
 interface LandingPageEnhancedProps {
   onGetStarted: () => void;
@@ -11,6 +12,7 @@ interface LandingPageEnhancedProps {
 const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted, onExploreMode }) => {
   const { user, loading, signOut } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   
   // Bypass authentication in development mode
   const BYPASS_AUTH = false; // Set to false to re-enable authentication
@@ -38,7 +40,7 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
   };
 
   const handlePlayBlindDate = () => {
-    handleExploreMode('blind-date');
+    setShowWaitlistModal(true);
   };
 
   const primaryModes = [
@@ -186,7 +188,7 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
                   onClick={handlePlayBlindDate}
                   className="bg-white text-purple-600 font-bold py-4 px-8 rounded-2xl hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                 >
-                  🎮 Play Now
+                  📝 Join Waitlist
                 </button>
                 <div className="text-sm text-purple-200 self-center">
                   Invite your partner or Quick-Match with others 🔗
@@ -267,7 +269,7 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
                   
                   <div className="bg-white/20 rounded-2xl px-6 py-3 inline-block">
                     <span className="font-semibold">
-                      {mode.id === 'blind-date' ? '🎮 Start Game' : '✨ Get Started'}
+                      {mode.id === 'blind-date' ? '📝 Join Waitlist' : '✨ Get Started'}
                     </span>
                   </div>
                 </div>
@@ -320,7 +322,7 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
                 onClick={handlePlayBlindDate}
                 className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-4 px-8 rounded-2xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                Try the Style-Off Game
+                📝 Join Waitlist
               </button>
             </div>
           </div>
@@ -413,6 +415,13 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
           />
         )}
       </AnimatePresence>
+
+      {/* Waitlist Modal */}
+      <WaitlistModal
+        isOpen={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
+        source="blind_date_game"
+      />
     </div>
   );
 };

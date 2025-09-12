@@ -78,8 +78,8 @@ const AppContent: React.FC = () => {
     location: LOCATIONS[1].promptValue,  // Taj Mahal by default
     brideAttire: BRIDE_ATTIRE[1].promptValue,  // Red Lehenga by default
     groomAttire: GROOM_ATTIRE[1].promptValue,  // Classic Sherwani by default
-    bridePose: BRIDE_POSES[1].promptValue,  // Front View by default
-    groomPose: GROOM_POSES[1].promptValue,  // Front View by default
+    bridePose: SOLO_BRIDE_POSES[1].promptValue,  // Regal Sitting Pose by default for solo shots
+    groomPose: SOLO_GROOM_POSES[1].promptValue,  // On Decorated Horse by default for solo shots
     style: STYLES[0].promptValue,  // Cinematic by default
     hairstyle: HAIRSTYLES[1].promptValue,  // Elegant updo by default
     groomHairstyle: GROOM_HAIRSTYLES[1].promptValue,  // Classic gel by default
@@ -610,15 +610,7 @@ const AppContent: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 justify-center mb-8">
-              <button 
-                  onClick={() => setStage('tabs')}
-                  className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  Explore New Modes
-              </button>
+              {/* Explore New Modes button hidden as requested */}
               <button 
                   onClick={handleStartOver}
                   className="bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
