@@ -39,10 +39,12 @@ const AppContent: React.FC = () => {
   // When bypassing auth, don't use auth loading state to prevent navigation loops
   const { loading: authLoading, user } = useAuth();
   const loading = BYPASS_AUTH ? false : authLoading;
-  // Initialize stage based on URL hash for admin persistence
+  // Initialize stage - always start at landing page
   const getInitialStage = (): AppStage => {
-    if (window.location.hash === '#admin') return 'admin';
-    if (window.location.hash === '#tabs') return 'tabs';
+    // Clear any existing hash to prevent navigation issues
+    if (window.location.hash) {
+      window.location.hash = '';
+    }
     return 'landing';
   };
   

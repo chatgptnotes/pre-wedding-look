@@ -28,10 +28,6 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
   const handleExploreMode = (modeId: string) => {
     if (BYPASS_AUTH || user) {
       // Navigate to specific mode
-      if (modeId === 'classic') {
-        // For Classic Pre-Wedding, navigate directly to tabs
-        window.location.hash = 'tabs';
-      }
       onGetStarted();
       onExploreMode?.(modeId);
     } else {
@@ -408,7 +404,6 @@ const LandingPageEnhanced: React.FC<LandingPageEnhancedProps> = ({ onGetStarted,
             onSuccess={() => {
               setShowAuthModal(false);
               // Navigate directly to classic mode (bride step)
-              window.location.hash = '';
               onGetStarted();
               onExploreMode?.('classic');
             }}
