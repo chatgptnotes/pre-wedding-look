@@ -1,18 +1,15 @@
 
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useClaudeCode } from '../contexts/ClaudeCodeContext';
 import UserProfile from './UserProfile';
 
 interface HeaderProps {
   onShowFavorites?: () => void;
   onShowComparison?: () => void;
-  onShowClaudeCodeSettings?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison, onShowClaudeCodeSettings }) => {
+const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison }) => {
   const { user, loading, signOut } = useAuth();
-  const { isEnabled, getStatus } = useClaudeCode();
 
   const handleSignOut = () => {
     console.log('Sign out clicked - Force logout');
@@ -82,25 +79,6 @@ const Header: React.FC<HeaderProps> = ({ onShowFavorites, onShowComparison, onSh
               </button>
             )}
 
-            {/* Claude Code Settings Button */}
-            {onShowClaudeCodeSettings && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShowClaudeCodeSettings();
-                }}
-                className={`${
-                  isEnabled 
-                    ? 'bg-green-500/20 hover:bg-green-500/30 border border-green-400/50' 
-                    : 'bg-white/20 hover:bg-white/30'
-                } text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 flex items-center cursor-pointer`}
-                title="Claude Code Settings"
-              >
-                <span className="text-base mr-1">{isEnabled ? '🟢' : '⚪'}</span>
-                <span className="hidden sm:inline">Claude Code</span>
-              </button>
-            )}
 
             {user && (
               <>

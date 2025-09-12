@@ -611,6 +611,67 @@ export async function generateMagicVariations(
   return generatedImages;
 }
 
+export async function generateCouplePhotoWithSceneChange(
+  config: GenerationConfig,
+  coupleImage: string
+): Promise<string> {
+  const { location, bridePose, groomPose, style, aspectRatio } = config;
+
+  const requestParts: ({ inlineData: { mimeType: string; data: string; } } | { text: string })[] = [];
+  
+  const photographyDetails = `The final image should be a high-quality photograph with photorealistic detail, soft natural lighting, and a shallow depth of field (bokeh) to create a romantic atmosphere.`;
+
+  requestParts.push(fileToGenerativePart(coupleImage));
+
+  const promptParts = [
+    '**Task:** Transform the provided couple photo by changing ONLY the background location, poses, and artistic style while preserving everything else exactly.',
+    '',
+    '🚨 **ABSOLUTE PRESERVATION RULES:** 🚨',
+    '1. **FACES MUST REMAIN 100% IDENTICAL:** Both faces must be copied EXACTLY as they appear.',
+    '2. **CLOTHING MUST REMAIN IDENTICAL:** Keep all their current outfits, colors, textures, and styling exactly the same.',
+    '3. **NO MODIFICATIONS TO:** Faces, skin tone, facial features, clothing, accessories, jewelry, makeup, hair styling.',
+    '4. **PRESERVE IDENTITIES:** The couple must be instantly recognizable as the same people.',
+    '',
+    '**ONLY THESE CHANGES ALLOWED:**',
+    location ? `- **Background/Location:** Change the background setting to ${location} while keeping the couple exactly as they are.` : '',
+    bridePose || groomPose ? `- **Body Poses:** Adjust body positioning - bride: ${bridePose || 'maintain current pose'}, groom: ${groomPose || 'maintain current pose'} but keep faces and clothes identical.` : '',
+    style ? `- **Artistic Style:** Apply ${style} to the overall lighting, atmosphere, and background ambiance only.` : '',
+    `- **Photography:** ${photographyDetails}`,
+    aspectRatio ? `- **Aspect Ratio:** The image must have a ${aspectRatio}.` : '',
+    '',
+    '**CRITICAL:** This is a scene/background transformation only. The couple themselves (faces, clothing, accessories) should look exactly as in the original photo, just in a new location with new poses.'
+  ];
+  
+  const prompt = promptParts.filter(Boolean).join('\n');
+
+  try {
+    requestParts.push({ text: prompt });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image-preview',
+      contents: {
+        parts: requestParts,
+      },
+      config: {
+        responseModalities: [Modality.IMAGE, Modality.TEXT],
+      },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData && part.inlineData.mimeType && part.inlineData.data) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    
+    throw new Error(`Image generation failed. Model response: ${response.candidates[0]?.content.parts[0]?.text || 'No image generated'}`);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate the image: ${error.message}`);
+    }
+    throw new Error('Failed to generate the image. The model may not have been able to process the request. Please try with different images or options.');
+  }
+}
+
 export async function generatePersonalizedImage(
   config: GenerationConfig,
   brideImage: string | null,
@@ -622,6 +683,11 @@ export async function generatePersonalizedImage(
   let prompt = '';
 
   const photographyDetails = `The final image should be a high-quality photograph with photorealistic detail, soft natural lighting, and a shallow depth of field (bokeh) to create a romantic atmosphere.`;
+
+  // Check if this is a couple photo (same image passed twice)
+  if (brideImage && groomImage && brideImage === groomImage) {
+    return generateCouplePhotoWithSceneChange(config, brideImage);
+  }
 
   if (brideImage && groomImage) {
     // Couple Photoshoot Logic

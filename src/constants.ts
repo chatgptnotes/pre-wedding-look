@@ -2,8 +2,8 @@ import { SelectionOption } from './types';
 
 const NONE_OPTION: SelectionOption = {
   id: 'none',
-  label: 'None',
-  imageUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cline x1='4.93' y1='4.93' x2='19.07' y2='19.07'%3E%3C/line%3E%3C/svg%3E`,
+  label: 'No Selection',
+  imageUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='15' fill='white' stroke='%23e5e7eb' stroke-width='2'/%3E%3Cg transform='translate(50,50)'%3E%3Ccircle cx='0' cy='0' r='25' fill='%23f9fafb' stroke='%23e5e7eb' stroke-width='1'/%3E%3Cpath d='M-8,-8 L8,8 M8,-8 L-8,8' stroke='%23374151' stroke-width='3' stroke-linecap='round'/%3E%3C/g%3E%3Ctext x='50' y='85' text-anchor='middle' fill='%23374151' font-family='Arial, sans-serif' font-size='10' font-weight='bold'%3ENone%3C/text%3E%3C/svg%3E`,
   promptValue: '',
 };
 
@@ -59,26 +59,60 @@ export const GROOM_ATTIRE: SelectionOption[] = [
   { id: 'gatt4', label: 'Modern Tuxedo', imageUrl: '/images/grooms/Modern Tuxedo.jpg', promptValue: 'a modern, well-fitted tuxedo' },
 ];
 
+// Solo poses for individual styling
+export const SOLO_BRIDE_POSES: SelectionOption[] = [
+    NONE_OPTION,
+    { id: 'bpose1', label: 'Regal Sitting Pose', imageUrl: '/images/bride/brideposes/Regal Sitting Pose.png', promptValue: 'sitting regally on an ornate surface with traditional red lehenga, one hand on hip, majestic pose' },
+    { id: 'bpose2', label: 'Playful Sunglasses', imageUrl: '/images/bride/brideposes/Playful Sunglasses.png', promptValue: 'sitting with stylish sunglasses, playful and modern bridal attitude with confident smile' },
+    { id: 'bpose3', label: 'Laughing with Mehndi', imageUrl: '/images/bride/brideposes/Laughing with Mehndi.png', promptValue: 'laughing joyfully while showing beautiful mehndi designs, hand near face, pure happiness expression' },
+    { id: 'bpose4', label: 'Fountain Side Pose', imageUrl: '/images/bride/brideposes/Fountain Side Pose.png', promptValue: 'sitting gracefully by a fountain in elaborate lehenga, looking down shyly, palace background' },
+    { id: 'bpose5', label: 'Lehenga Twirl', imageUrl: '/images/bride/brideposes/Lehenga Twirl.png', promptValue: 'mid-twirl with lehenga flowing dramatically, dupatta spread wide, dynamic movement capture' },
+    { id: 'bpose6', label: 'Classic Bridal Portrait', imageUrl: '/images/bride/brideposes/Classic Bridal Portrait.png', promptValue: 'traditional bridal portrait with hands placed elegantly, direct gaze at camera, serene expression' },
+    { id: 'bpose7', label: 'Side Profile Grace', imageUrl: '/images/bride/brideposes/Side Profile Grace.png', promptValue: 'elegant side profile showing jewelry and dupatta draping, peaceful downward gaze' },
+    { id: 'bpose8', label: 'Dupatta Flow', imageUrl: '/images/bride/brideposes/Dupatta Flow.png', promptValue: 'holding dupatta ends creating graceful flow, standing pose with gentle breeze effect' },
+    { id: 'bpose9', label: 'Jewelry Showcase', imageUrl: '/images/bride/brideposes/Jewelry Showcase.png', promptValue: 'posed to prominently display heavy traditional jewelry, necklaces and earrings highlighted' },
+    { id: 'bpose10', label: 'Palace Steps', imageUrl: '/images/bride/brideposes/Palace Steps.png', promptValue: 'sitting on ornate palace steps, lehenga spread beautifully, architectural backdrop' },
+    { id: 'bpose11', label: 'Confident Standing', imageUrl: '/images/bride/brideposes/Confident Standing.png', promptValue: 'standing confidently with one hand on hip, strong posture, empowered bridal look' },
+    { id: 'bpose12', label: 'Dreamy Look Away', imageUrl: '/images/bride/brideposes/Dreamy Look Away.png', promptValue: 'looking away dreamily with soft expression, romantic and contemplative mood' },
+];
+
+export const SOLO_GROOM_POSES: SelectionOption[] = [
+    NONE_OPTION,
+    { id: 'gpose1', label: 'Classic Formal Portrait', imageUrl: '/images/grooms/groomposes/Classic Formal Portrait.png', promptValue: 'standing in a classic formal portrait pose with hands at sides or behind back' },
+    { id: 'gpose2', label: 'Confident Stance', imageUrl: '/images/grooms/groomposes/Confident Stance.png', promptValue: 'standing confidently with one hand in pocket and looking directly at camera' },
+    { id: 'gpose3', label: 'Elegant Side Profile', imageUrl: '/images/grooms/groomposes/Elegant Side Profile.png', promptValue: 'posed in an elegant side profile showing the outline of his attire' },
+    { id: 'gpose4', label: 'Hands Clasped', imageUrl: '/images/grooms/groomposes/Hands Clasped.png', promptValue: 'standing with hands clasped in front, formal and dignified pose' },
+    { id: 'gpose5', label: 'Leaning Casual', imageUrl: '/images/grooms/groomposes/Leaning Casual.png', promptValue: 'casually leaning against a pillar or wall with arms crossed' },
+    { id: 'gpose6', label: 'Walking Stride', imageUrl: '/images/grooms/groomposes/Walking Stride.png', promptValue: 'captured mid-stride while walking, dynamic and natural movement' },
+    { id: 'gpose7', label: 'Adjusting Cufflinks', imageUrl: '/images/grooms/groomposes/Adjusting Cufflinks.png', promptValue: 'adjusting cufflinks or straightening tie, showing attention to detail' },
+    { id: 'gpose8', label: 'Looking Over Shoulder', imageUrl: '/images/grooms/groomposes/Looking Over Shoulder.png', promptValue: 'looking back over shoulder with a confident expression' },
+    { id: 'gpose9', label: 'Seated Elegant', imageUrl: '/images/grooms/groomposes/Seated Elegant.png', promptValue: 'sitting elegantly in a chair with one leg crossed over the other' },
+    { id: 'gpose10', label: 'Arms Crossed', imageUrl: '/images/grooms/groomposes/Arms Crossed.png', promptValue: 'standing with arms crossed, showing confidence and strength' },
+    { id: 'gpose11', label: 'Hand in Jacket', imageUrl: '/images/grooms/groomposes/Hand in Jacket.png', promptValue: 'classic pose with one hand partially in jacket, sophisticated look' },
+    { id: 'gpose12', label: 'Thoughtful Pose', imageUrl: '/images/grooms/groomposes/Thoughtful Pose.png', promptValue: 'in a thoughtful pose with hand near chin or temple' },
+];
+
+// Couple poses for Create Scene section
 export const BRIDE_POSES: SelectionOption[] = [
     NONE_OPTION,
-    { id: 'bpose1', label: 'Front View', imageUrl: '/images/scen/Front View.png', promptValue: 'standing in a front view portrait' },
-    { id: 'bpose13', label: 'Laaj Pose', imageUrl: '/images/scen/Laaj Pose.jpg', promptValue: "in a traditional shy 'laaj' pose, coyly looking down" },
+    { id: 'bpose1', label: 'Front View', imageUrl: '/images/scen/Front View.png', promptValue: 'standing in a front view portrait with the groom' },
+    { id: 'bpose13', label: 'Laaj Pose', imageUrl: '/images/scen/Laaj Pose.jpg', promptValue: "in a traditional shy 'laaj' pose, coyly looking down while standing with the groom" },
     { id: 'bpose14', label: 'Performing Aukshan', imageUrl: '/images/scen/Performing Aukshan.png', promptValue: "gracefully performing the traditional 'aukshan' ritual for the groom with a decorative platter" },
     { id: 'bpose5', label: 'Looking at Groom', imageUrl: '/images/scen/Looking at Groom-Looking at Bride.jpg', promptValue: 'looking lovingly at the groom' },
-    { id: 'bpose6', label: 'Twirling', imageUrl: '/images/scen/Twirling.jpg', promptValue: 'playfully twirling' },
+    { id: 'bpose6', label: 'Twirling', imageUrl: '/images/scen/Twirling.jpg', promptValue: 'playfully twirling while the groom watches admiringly' },
     { id: 'bpose7', label: 'Leaning on Shoulder', imageUrl: '/images/scen/Leaning on Shoulder.jpg', promptValue: "gently leaning her head on the groom's shoulder" },
     { id: 'bpose10', label: 'Forehead Touch', imageUrl: '/images/scen/Forehead Touch.jpg', promptValue: 'gently touching foreheads with the groom in a moment of intimacy' },
     { id: 'bpose11', label: 'Adjusting Tie', imageUrl: '/images/scen/Adjusting Tie.png', promptValue: "lovingly adjusting the groom's tie or kurta collar" },
     { id: 'bpose12', label: 'Walking Together', imageUrl: '/images/scen/Walking Together.png', promptValue: 'walking hand-in-hand with the groom, sharing a smile' },
-    { id: 'bpose9', label: 'Sitting Gracefully', imageUrl: '/images/scen/Sitting Gracefully.jpg', promptValue: 'sitting gracefully, looking towards the camera' },
-    { id: 'bpose2', label: 'Side View', imageUrl: '/images/scen/Side View.png', promptValue: 'in a side profile view' },
-    { id: 'bpose3', label: 'Back View', imageUrl: '/images/scen/Back View.png', promptValue: 'showing the back of her attire' },
-    { id: 'bpose4', label: 'Top-down View', imageUrl: '/images/scen/Top-down View.jpg', promptValue: 'seen from a top-down angle' },
+    { id: 'bpose9', label: 'Sitting Gracefully', imageUrl: '/images/scen/Sitting Gracefully.jpg', promptValue: 'sitting gracefully next to the groom, looking towards the camera' },
+    { id: 'bpose2', label: 'Side View', imageUrl: '/images/scen/Side View.png', promptValue: 'in a side profile view with the groom' },
+    { id: 'bpose3', label: 'Back View', imageUrl: '/images/scen/Back View.png', promptValue: 'showing the back of her attire while standing with the groom' },
+    { id: 'bpose4', label: 'Top-down View', imageUrl: '/images/scen/Top-down View.jpg', promptValue: 'seen from a top-down angle with the groom' },
 ];
 
 export const GROOM_POSES: SelectionOption[] = [
     NONE_OPTION,
-    { id: 'gpose1', label: 'Front View', imageUrl: '/images/scen/Front View.png', promptValue: 'standing in a front view portrait' },
+    { id: 'gpose1', label: 'Front View', imageUrl: '/images/scen/Front View.png', promptValue: 'standing in a front view portrait with the bride' },
     { id: 'gpose13', label: 'Offering Gajra', imageUrl: '/images/scen/Offering Gajra.jpg', promptValue: 'lovingly offering a gajra (flower garland) to the bride' },
     { id: 'gpose14', label: 'On Decorated Horse', imageUrl: '/images/scen/On Decorated Horse.png', promptValue: 'majestically sitting on a decorated horse, ready for the baraat (wedding procession)' },
     { id: 'gpose5', label: 'Looking at Bride', imageUrl: '/images/scen/Looking at Groom-Looking at Bride.jpg', promptValue: 'looking lovingly at the bride' },
@@ -88,9 +122,9 @@ export const GROOM_POSES: SelectionOption[] = [
     { id: 'gpose11', label: 'Helping Hand', imageUrl: '/images/scen/Helping Hand.jpg', promptValue: "gallantly helping the bride down a set of steps" },
     { id: 'gpose12', label: 'Walking Together', imageUrl: '/images/scen/Walking Together.png', promptValue: "walking hand-in-hand with the bride, looking at her lovingly" },
     { id: 'gpose9', label: 'Forehead Kiss', imageUrl: '/images/scen/Forehead Kiss.jpg', promptValue: 'gently kissing the bride on her forehead' },
-    { id: 'gpose2', label: 'Side View', imageUrl: '/images/scen/Side View.png', promptValue: 'in a side profile view' },
-    { id: 'gpose3', label: 'Back View', imageUrl: '/images/scen/Back View.png', promptValue: 'showing the back of his attire' },
-    { id: 'gpose4', label: 'Top-down View', imageUrl: '/images/scen/Top-down View.jpg', promptValue: 'seen from a top-down angle' },
+    { id: 'gpose2', label: 'Side View', imageUrl: '/images/scen/Side View.png', promptValue: 'in a side profile view with the bride' },
+    { id: 'gpose3', label: 'Back View', imageUrl: '/images/scen/Back View.png', promptValue: 'showing the back of his attire while standing with the bride' },
+    { id: 'gpose4', label: 'Top-down View', imageUrl: '/images/scen/Top-down View.jpg', promptValue: 'seen from a top-down angle with the bride' },
 ];
 
 export const STYLES: SelectionOption[] = [

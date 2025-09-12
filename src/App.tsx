@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ClaudeCodeProvider } from './contexts/ClaudeCodeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import LandingPageEnhanced from './components/LandingPageEnhanced';
@@ -12,7 +11,6 @@ import ImageUploader from './components/ImageUploader';
 import MagicCreation from './components/MagicCreation';
 import FavoritesModal from './components/FavoritesModal';
 import ComparisonModal from './components/ComparisonModal';
-import ClaudeCodeSettingsModal from './components/ClaudeCodeSettingsModal';
 // New Tab Components
 import StoryboardTab from './components/tabs/StoryboardTab';
 import FusionRealityTab from './components/tabs/FusionRealityTab';
@@ -27,7 +25,7 @@ import BlindDateTab from './components/tabs/BlindDateTab';
 import AdminPage from './components/AdminPage';
 import { generatePersonalizedImage } from './services/geminiService';
 import { GenerationConfig, ComparisonItem } from './types';
-import { LOCATIONS, BRIDE_ATTIRE, GROOM_ATTIRE, BRIDE_POSES, GROOM_POSES, STYLES, HAIRSTYLES, GROOM_HAIRSTYLES, ASPECT_RATIOS, JEWELRY } from './constants';
+import { LOCATIONS, BRIDE_ATTIRE, GROOM_ATTIRE, BRIDE_POSES, GROOM_POSES, SOLO_BRIDE_POSES, SOLO_GROOM_POSES, STYLES, HAIRSTYLES, GROOM_HAIRSTYLES, ASPECT_RATIOS, JEWELRY } from './constants';
 import { DatabaseService } from './services/databaseService';
 import { PreWeddingProject } from './lib/supabase';
 import { AuthService } from './services/authService';
@@ -55,6 +53,18 @@ const AppContent: React.FC = () => {
   // Original uploaded images
   const [originalBrideImage, setOriginalBrideImage] = useState<string | null>(null);
   const [originalGroomImage, setOriginalGroomImage] = useState<string | null>(null);
+  const [coupleImage, setCoupleImage] = useState<string | null>(null);
+  
+  const handleRegenerateWithSameFace = () => {
+    // Regenerate the current stage's image with same face but possibly different location/poses
+    if (stage === 'bride' && originalBrideImage) {
+      handleGenerateBride();
+    } else if (stage === 'groom' && originalGroomImage) {
+      handleGenerateGroom();
+    } else if (stage === 'couple' && (coupleImage || (generatedBrideImage && generatedGroomImage))) {
+      handleGenerateCouple();
+    }
+  };
 
   // Intermediary generated solo images
   const [generatedBrideImage, setGeneratedBrideImage] = useState<string | null>(null);
@@ -85,7 +95,6 @@ const AppContent: React.FC = () => {
   const [showFavorites, setShowFavorites] = useState<boolean>(false);
   const [showComparison, setShowComparison] = useState<boolean>(false);
   const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
-  const [showClaudeCodeSettings, setShowClaudeCodeSettings] = useState<boolean>(false);
 
   const handleConfigChange = useCallback((key: keyof GenerationConfig, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -106,7 +115,8 @@ const AppContent: React.FC = () => {
         groomAttire: '',
         groomPose: '',
         groomHairstyle: '',
-        bridePose: BRIDE_POSES.find(p => p.id === 'bpose1')?.promptValue || 'standing in a front view portrait', // Default to front view
+        // Use the selected bride pose from config, fallback to default if none selected
+        bridePose: config.bridePose || SOLO_BRIDE_POSES.find(p => p.id === 'bpose1')?.promptValue || 'sitting regally in an elegant bridal pose',
         style: STYLES[0].promptValue // Default to cinematic for consistency
       };
       const imageUrl = await generatePersonalizedImage(soloBrideConfig, originalBrideImage, null);
@@ -136,7 +146,8 @@ const AppContent: React.FC = () => {
           bridePose: '',
           hairstyle: '',
           jewelry: '',
-          groomPose: GROOM_POSES.find(p => p.id === 'gpose1')?.promptValue || 'standing in a front view portrait', // Default to front view
+          // Use the selected groom pose from config, fallback to default if none selected
+          groomPose: config.groomPose || SOLO_GROOM_POSES.find(p => p.id === 'gpose1')?.promptValue || 'standing in a classic formal portrait pose',
           style: STYLES[0].promptValue
       };
       const imageUrl = await generatePersonalizedImage(soloGroomConfig, null, originalGroomImage);
@@ -152,23 +163,36 @@ const AppContent: React.FC = () => {
   };
 
   const handleGenerateCouple = async () => {
-    if (!generatedBrideImage || !generatedGroomImage) {
-      setError("Generated bride and groom images are missing.");
+    // Check if we have either couple photo or individual styled photos
+    if (coupleImage) {
+      // Use couple photo directly
+    } else if (!generatedBrideImage || !generatedGroomImage) {
+      setError("Please upload a couple photo or complete bride and groom styling first.");
       return;
     }
+    
     setIsLoading(true);
     setError(null);
     try {
       // Use only relevant config for the final scene
       const coupleConfig: GenerationConfig = {
         ...config,
-        brideAttire: '', // Attire is already in the generated images
+        brideAttire: '', // Attire is already in the generated images or original couple photo
         groomAttire: '',
         hairstyle: '',
         groomHairstyle: '',
         jewelry: ''
       };
-      const imageUrl = await generatePersonalizedImage(coupleConfig, generatedBrideImage, generatedGroomImage);
+      
+      let imageUrl: string;
+      if (coupleImage) {
+        // For couple photos, use them directly as both inputs to preserve the couple
+        imageUrl = await generatePersonalizedImage(coupleConfig, coupleImage, coupleImage);
+      } else {
+        // Use individual styled photos
+        imageUrl = await generatePersonalizedImage(coupleConfig, generatedBrideImage, generatedGroomImage);
+      }
+      
       setFinalImage(imageUrl);
       setSelectedViewImage(null); // Clear selected view when new image is generated
       // Auto-add to comparison
@@ -186,6 +210,7 @@ const AppContent: React.FC = () => {
     setStage('landing');
     setOriginalBrideImage(null);
     setOriginalGroomImage(null);
+    setCoupleImage(null);
     setGeneratedBrideImage(null);
     setGeneratedGroomImage(null);
     setFinalImage(null);
@@ -304,7 +329,6 @@ const AppContent: React.FC = () => {
         <Header 
           onShowFavorites={() => setShowFavorites(true)} 
           onShowComparison={() => setShowComparison(true)}
-          onShowClaudeCodeSettings={() => setShowClaudeCodeSettings(true)}
         />
         <main className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-7xl mx-auto space-y-8">
@@ -489,11 +513,6 @@ const AppContent: React.FC = () => {
           initialImages={comparisonItems}
         />
 
-        {/* Claude Code Settings Modal */}
-        <ClaudeCodeSettingsModal
-          isOpen={showClaudeCodeSettings}
-          onClose={() => setShowClaudeCodeSettings(false)}
-        />
       </div>
     );
   }
@@ -504,61 +523,148 @@ const AppContent: React.FC = () => {
       <Header 
         onShowFavorites={() => setShowFavorites(true)} 
         onShowComparison={() => setShowComparison(true)}
-        onShowClaudeCodeSettings={() => setShowClaudeCodeSettings(true)}
       />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 sm:gap-8 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 sm:gap-6 max-w-7xl mx-auto">
           
-          <div className="xl:col-span-3 bg-white/80 backdrop-blur-sm p-6 sm:p-8 rounded-3xl shadow-2xl border border-white/50 self-start hover:shadow-3xl transition-all duration-300">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-gradient-to-r from-rose-200 to-pink-200">
-                <div className="mb-4 sm:mb-0">
-                  <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent mb-2">
-                    {stage === 'bride' && (
-                      <span className="flex items-center">
-                        <span className="text-3xl mr-2">👰</span>
-                        Step 1: Style the Bride
-                      </span>
-                    )}
-                    {stage === 'groom' && (
-                      <span className="flex items-center">
-                        <span className="text-3xl mr-2">🤵</span>
-                        Step 2: Style the Groom
-                      </span>
-                    )}
-                    {stage === 'couple' && (
-                      <span className="flex items-center">
-                        <span className="text-3xl mr-2">💕</span>
-                        Step 3: Create the Scene
-                      </span>
-                    )}
-                  </h2>
-                  <p className="text-gray-600 text-sm sm:text-base">
-                    {stage === 'bride' && "Upload a clear photo of the bride and choose her perfect look."}
-                    {stage === 'groom' && "Now upload the groom's photo and select his handsome style."}
-                    {stage === 'couple' && "Set the final romantic scene. Feel free to change options and regenerate as many times as you like!"}
-                  </p>
+          <div className="lg:col-span-1 xl:col-span-3 bg-gradient-to-br from-white/95 via-white/90 to-rose-50/80 backdrop-blur-xl p-6 sm:p-8 rounded-3xl shadow-2xl border border-rose-100/60 self-start hover:shadow-3xl transition-all duration-500">
+            {/* Enhanced Header with Step Progress */}
+            <div className="mb-8">
+              {/* Progress Indicator */}
+              <div className="flex items-center justify-center mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-full border-3 transition-all duration-300 ${
+                    stage === 'bride' ? 'bg-rose-500 border-rose-500 text-white shadow-lg' : 
+                    ['groom', 'couple'].includes(stage) ? 'bg-rose-100 border-rose-300 text-rose-600' : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    <span className="text-lg font-bold">1</span>
+                  </div>
+                  <div className={`w-16 h-1 rounded-full transition-all duration-300 ${
+                    ['groom', 'couple'].includes(stage) ? 'bg-rose-300' : 'bg-gray-200'
+                  }`}></div>
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-full border-3 transition-all duration-300 ${
+                    stage === 'groom' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 
+                    stage === 'couple' ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    <span className="text-lg font-bold">2</span>
+                  </div>
+                  <div className={`w-16 h-1 rounded-full transition-all duration-300 ${
+                    stage === 'couple' ? 'bg-blue-300' : 'bg-gray-200'
+                  }`}></div>
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-full border-3 transition-all duration-300 ${
+                    stage === 'couple' ? 'bg-purple-500 border-purple-500 text-white shadow-lg' : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    <span className="text-lg font-bold">3</span>
+                  </div>
                 </div>
-                <div className="flex gap-2">
+              </div>
+
+              {/* Main Title with Enhanced Styling */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center mb-4">
+                  {stage === 'bride' && (
+                    <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-rose-100 to-pink-100 rounded-full shadow-lg mb-2">
+                      <span className="text-4xl">👰</span>
+                    </div>
+                  )}
+                  {stage === 'groom' && (
+                    <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full shadow-lg mb-2">
+                      <span className="text-4xl">🤵</span>
+                    </div>
+                  )}
+                  {stage === 'couple' && (
+                    <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full shadow-lg mb-2">
+                      <span className="text-4xl">💕</span>
+                    </div>
+                  )}
+                </div>
+                
+                <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+                  {stage === 'bride' && (
+                    <span className="bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 bg-clip-text text-transparent">
+                      Style the Beautiful Bride
+                    </span>
+                  )}
+                  {stage === 'groom' && (
+                    <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 bg-clip-text text-transparent">
+                      Style the Handsome Groom
+                    </span>
+                  )}
+                  {stage === 'couple' && (
+                    <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-700 bg-clip-text text-transparent">
+                      Create the Perfect Scene
+                    </span>
+                  )}
+                </h2>
+                
+                <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+                  {stage === 'bride' && "Upload a stunning photo of the bride and customize her perfect wedding look with elegant attire, jewelry, and poses."}
+                  {stage === 'groom' && "Now showcase the groom with a handsome photo and select his distinguished style with classic attire and sophisticated poses."}
+                  {stage === 'couple' && "Bring it all together! Set the romantic scene, choose magical locations, and create unforgettable couple moments."}
+                </p>
+              </div>
+
+              {/* Enhanced Navigation Pills */}
+              <div className="flex justify-center">
+                <div className="flex gap-2 bg-white/70 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/40">
                   <button 
-                      onClick={() => setStage('tabs')}
-                      className="bg-gradient-to-r from-purple-100 to-pink-100 hover:from-purple-200 hover:to-pink-200 text-purple-700 hover:text-purple-800 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                      onClick={() => setStage('bride')}
+                      className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
+                        stage === 'bride' 
+                          ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg transform scale-105' 
+                          : 'text-rose-600 hover:bg-rose-50 hover:shadow-md'
+                      }`}
                   >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                      New Features
+                      <span className="text-lg">👰</span>
+                      <span>Bride</span>
                   </button>
                   <button 
-                      onClick={handleStartOver}
-                      className="bg-gradient-to-r from-gray-100 to-gray-200 hover:from-rose-100 hover:to-pink-100 text-gray-700 hover:text-rose-600 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                      onClick={() => setStage('groom')}
+                      className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
+                        stage === 'groom' 
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transform scale-105' 
+                          : 'text-blue-600 hover:bg-blue-50 hover:shadow-md'
+                      }`}
                   >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
-                      </svg>
-                      Start Over
+                      <span className="text-lg">🤵</span>
+                      <span>Groom</span>
+                  </button>
+                  <button 
+                      onClick={() => setStage('couple')}
+                      className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
+                        stage === 'couple' 
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg transform scale-105' 
+                          : 'text-purple-600 hover:bg-purple-50 hover:shadow-md'
+                      }`}
+                  >
+                      <span className="text-lg">💕</span>
+                      <span>Scene</span>
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3 justify-center mb-8">
+              <button 
+                  onClick={() => setStage('tabs')}
+                  className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Explore New Modes
+              </button>
+              <button 
+                  onClick={handleStartOver}
+                  className="bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
+                  </svg>
+                  Start Fresh
+              </button>
             </div>
 
             {stage === 'bride' && (
@@ -567,6 +673,7 @@ const AppContent: React.FC = () => {
                 <OptionSelector label="Bride's Attire" options={BRIDE_ATTIRE} selectedValue={config.brideAttire} onChange={(v) => handleConfigChange('brideAttire', v)} />
                 <OptionSelector label="Bride's Hairstyle" options={HAIRSTYLES} selectedValue={config.hairstyle} onChange={(v) => handleConfigChange('hairstyle', v)} />
                 <OptionSelector label="Bride's Jewelry" options={JEWELRY} selectedValue={config.jewelry} onChange={(v) => handleConfigChange('jewelry', v)} />
+                <OptionSelector label="Bride's Pose" options={SOLO_BRIDE_POSES} selectedValue={config.bridePose} onChange={(v) => handleConfigChange('bridePose', v)} />
               </div>
             )}
 
@@ -575,41 +682,177 @@ const AppContent: React.FC = () => {
                 <ImageUploader label="Upload Groom's Photo" image={originalGroomImage} onImageChange={setOriginalGroomImage} onImageReset={() => setOriginalGroomImage(null)} />
                 <OptionSelector label="Groom's Attire" options={GROOM_ATTIRE} selectedValue={config.groomAttire} onChange={(v) => handleConfigChange('groomAttire', v)} />
                 <OptionSelector label="Groom's Hairstyle" options={GROOM_HAIRSTYLES} selectedValue={config.groomHairstyle} onChange={(v) => handleConfigChange('groomHairstyle', v)} />
+                <OptionSelector label="Groom's Pose" options={SOLO_GROOM_POSES} selectedValue={config.groomPose} onChange={(v) => handleConfigChange('groomPose', v)} />
               </div>
             )}
 
             {stage === 'couple' && (
               <div className="space-y-8">
-                <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-stone-100 rounded-lg">
-                    <div className="relative group">
-                        <h4 className="font-semibold text-center mb-2 text-stone-700">Styled Bride</h4>
-                        <div className="relative cursor-pointer" onClick={() => setSelectedViewImage(originalBrideImage || '')}>
-                            <img src={generatedBrideImage || ''} alt="Styled Bride" className="rounded-lg shadow-sm w-full object-cover hover:opacity-90 transition-opacity" />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 rounded-lg transition-all duration-300 flex items-center justify-center">
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold text-sm bg-black bg-opacity-60 px-3 py-1 rounded-full">
-                                    Click for original HD photo
-                                </div>
-                            </div>
-                        </div>
+                {/* Upload Options Toggle */}
+                <div className="p-4 bg-stone-100 rounded-lg">
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-stone-700 mb-3">Upload Options</h4>
+                    <div className="flex gap-4">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="uploadType"
+                          checked={!coupleImage}
+                          onChange={() => setCoupleImage(null)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">Use Individual Photos</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="uploadType"
+                          checked={!!coupleImage}
+                          onChange={() => {}}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">Upload Couple Photo</span>
+                      </label>
                     </div>
-                    <div className="relative group">
-                        <h4 className="font-semibold text-center mb-2 text-stone-700">Styled Groom</h4>
-                        <div className="relative cursor-pointer" onClick={() => setSelectedViewImage(originalGroomImage || '')}>
-                            <img src={generatedGroomImage || ''} alt="Styled Groom" className="rounded-lg shadow-sm w-full object-cover hover:opacity-90 transition-opacity" />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 rounded-lg transition-all duration-300 flex items-center justify-center">
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold text-sm bg-black bg-opacity-60 px-3 py-1 rounded-full">
-                                    Click for original HD photo
-                                </div>
-                            </div>
-                        </div>
+                  </div>
+
+                  {coupleImage ? (
+                    <div className="text-center">
+                      <h4 className="font-semibold mb-2 text-stone-700">Existing Couple Photo</h4>
+                      <img src={coupleImage} alt="Couple Photo" className="rounded-lg shadow-sm w-full object-cover h-32 mb-3" />
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                setCoupleImage(event.target?.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                          id="couple-upload"
+                        />
+                        <label
+                          htmlFor="couple-upload"
+                          className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg cursor-pointer hover:bg-purple-700 transition-colors text-center text-sm"
+                        >
+                          Change Photo
+                        </label>
+                        <button
+                          onClick={() => setCoupleImage(null)}
+                          className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      {!generatedBrideImage && !generatedGroomImage && (
+                        <div className="text-center mb-4">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setCoupleImage(event.target?.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="hidden"
+                            id="couple-upload-main"
+                          />
+                          <label
+                            htmlFor="couple-upload-main"
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg cursor-pointer hover:from-purple-700 hover:to-pink-700 transition-colors inline-block"
+                          >
+                            📸 Upload Couple Photo
+                          </label>
+                          <p className="text-xs text-gray-600 mt-2">
+                            Upload an existing couple photo to change scenes and poses only
+                          </p>
+                        </div>
+                      )}
+                      
+                      {(generatedBrideImage || generatedGroomImage) && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="relative group">
+                            <h4 className="font-semibold text-center mb-2 text-stone-700">Styled Bride</h4>
+                            {generatedBrideImage ? (
+                              <div className="relative cursor-pointer" onClick={() => setSelectedViewImage(originalBrideImage || '')}>
+                                <img src={generatedBrideImage} alt="Styled Bride" className="rounded-lg shadow-sm w-full object-cover hover:opacity-90 transition-opacity" />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 rounded-lg transition-all duration-300 flex items-center justify-center">
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold text-sm bg-black bg-opacity-60 px-3 py-1 rounded-full">
+                                    Click for original HD photo
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-200 rounded-lg h-24 flex items-center justify-center text-gray-500 text-sm">
+                                No styled bride photo
+                              </div>
+                            )}
+                          </div>
+                          <div className="relative group">
+                            <h4 className="font-semibold text-center mb-2 text-stone-700">Styled Groom</h4>
+                            {generatedGroomImage ? (
+                              <div className="relative cursor-pointer" onClick={() => setSelectedViewImage(originalGroomImage || '')}>
+                                <img src={generatedGroomImage} alt="Styled Groom" className="rounded-lg shadow-sm w-full object-cover hover:opacity-90 transition-opacity" />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 rounded-lg transition-all duration-300 flex items-center justify-center">
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold text-sm bg-black bg-opacity-60 px-3 py-1 rounded-full">
+                                    Click for original HD photo
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-200 rounded-lg h-24 flex items-center justify-center text-gray-500 text-sm">
+                                No styled groom photo
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-                <div>
-                    <OptionSelector label="Choose a Location" options={LOCATIONS} selectedValue={config.location} onChange={(v) => handleConfigChange('location', v)} />
-                    <OptionSelector label="Bride's Pose" options={BRIDE_POSES} selectedValue={config.bridePose} onChange={(v) => handleConfigChange('bridePose', v)} />
-                    <OptionSelector label="Groom's Pose" options={GROOM_POSES} selectedValue={config.groomPose} onChange={(v) => handleConfigChange('groomPose', v)} />
-                    <OptionSelector label="Art Style" options={STYLES} selectedValue={config.style} onChange={(v) => handleConfigChange('style', v)} />
-                    <OptionSelector label="Aspect Ratio" options={ASPECT_RATIOS} selectedValue={config.aspectRatio} onChange={(v) => handleConfigChange('aspectRatio', v)} />
+
+                {/* Scene Creation Options - Clean Layout */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-purple-100">
+                  <div className="space-y-12">
+                    {/* Location Section */}
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-100">
+                      <OptionSelector label="🏛️ Romantic Location" options={LOCATIONS} selectedValue={config.location} onChange={(v) => handleConfigChange('location', v)} />
+                    </div>
+                    
+                    {/* Poses Section */}
+                    <div className="space-y-8">
+                      <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl p-6 border border-rose-100">
+                        <OptionSelector label="👰 Bride's Pose" options={BRIDE_POSES} selectedValue={config.bridePose} onChange={(v) => handleConfigChange('bridePose', v)} />
+                      </div>
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                        <OptionSelector label="🤵 Groom's Pose" options={GROOM_POSES} selectedValue={config.groomPose} onChange={(v) => handleConfigChange('groomPose', v)} />
+                      </div>
+                    </div>
+                    
+                    {/* Style & Format Section */}
+                    <div className="space-y-8">
+                      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
+                        <OptionSelector label="🎨 Cinematic Style" options={STYLES} selectedValue={config.style} onChange={(v) => handleConfigChange('style', v)} />
+                      </div>
+                      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-100">
+                        <OptionSelector label="📐 Photo Format" options={ASPECT_RATIOS} selectedValue={config.aspectRatio} onChange={(v) => handleConfigChange('aspectRatio', v)} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -635,8 +878,7 @@ const AppContent: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setStage('groom')}
-                    disabled={!generatedBrideImage}
-                    className="w-full bg-white text-rose-600 border border-rose-600 font-bold text-lg py-3 rounded-lg shadow-sm hover:bg-rose-50 transition-all duration-300 disabled:bg-stone-100 disabled:text-stone-400 disabled:border-stone-300 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="w-full bg-white text-rose-600 border border-rose-600 font-bold text-lg py-3 rounded-lg shadow-sm hover:bg-rose-50 transition-all duration-300 flex items-center justify-center"
                     aria-label="Continue to Groom"
                   >
                     Continue to Groom &rarr;
@@ -664,8 +906,7 @@ const AppContent: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setStage('couple')}
-                    disabled={!generatedGroomImage}
-                    className="w-full bg-white text-rose-600 border border-rose-600 font-bold text-lg py-3 rounded-lg shadow-sm hover:bg-rose-50 transition-all duration-300 disabled:bg-stone-100 disabled:text-stone-400 disabled:border-stone-300 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="w-full bg-white text-rose-600 border border-rose-600 font-bold text-lg py-3 rounded-lg shadow-sm hover:bg-rose-50 transition-all duration-300 flex items-center justify-center"
                     aria-label="Continue to Scene"
                   >
                     Continue to Scene &rarr;
@@ -677,7 +918,7 @@ const AppContent: React.FC = () => {
                 <div className="space-y-4">
                   <button
                     onClick={handleGenerateCouple}
-                    disabled={isLoading}
+                    disabled={isLoading || (!coupleImage && (!generatedBrideImage || !generatedGroomImage))}
                     className="w-full bg-rose-600 text-white font-bold text-lg py-4 rounded-lg shadow-md hover:bg-rose-700 transition-all duration-300 disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center"
                     aria-label="Generate Scene"
                   >
@@ -695,7 +936,7 @@ const AppContent: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button
                       onClick={() => setShowMagicCreation(true)}
-                      disabled={!generatedBrideImage || !generatedGroomImage}
+                      disabled={!coupleImage && (!generatedBrideImage || !generatedGroomImage)}
                       className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg py-4 rounded-lg shadow-md hover:from-purple-700 hover:to-pink-700 transition-all duration-300 disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center"
                       aria-label="Magic Creation"
                     >
@@ -724,11 +965,17 @@ const AppContent: React.FC = () => {
 
           </div>
           
-          <div className="xl:col-span-2 lg:sticky lg:top-24 self-start">
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/50 p-6 sm:p-8 hover:shadow-3xl transition-all duration-300">
-              <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4 sm:mb-6 text-center">
-                ✨ Your Magical Creation
-              </h3>
+          <div className="lg:col-span-1 xl:col-span-2 lg:sticky lg:top-24 self-start">
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/50 p-4 sm:p-6 hover:shadow-3xl transition-all duration-300">
+              <div className="text-center mb-4 sm:mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full shadow-lg mb-3">
+                  <span className="text-3xl">✨</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-purple-700 bg-clip-text text-transparent">
+                  Your Magical Creation
+                </h3>
+                <p className="text-gray-600 mt-1 text-sm sm:text-base">Watch your vision come to life</p>
+              </div>
               <ImageDisplay 
                 imageUrl={displayImageUrl} 
                 isLoading={isLoading} 
@@ -736,6 +983,7 @@ const AppContent: React.FC = () => {
                 projectId={currentProject?.id}
                 config={config}
                 imageType={finalImage ? 'couple' : generatedGroomImage ? 'groom' : 'bride'}
+                onRegenerateWithSameFace={displayImageUrl ? handleRegenerateWithSameFace : undefined}
               />
             </div>
           </div>
@@ -751,6 +999,7 @@ const AppContent: React.FC = () => {
         <MagicCreation 
           brideImage={generatedBrideImage} 
           groomImage={generatedGroomImage} 
+          coupleImage={coupleImage}
           onClose={() => setShowMagicCreation(false)} 
         />
       )}
@@ -781,9 +1030,7 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <ClaudeCodeProvider>
-          <AppContent />
-        </ClaudeCodeProvider>
+        <AppContent />
       </AuthProvider>
     </ErrorBoundary>
   );

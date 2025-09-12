@@ -8,10 +8,11 @@ import LoadingSpinner from './LoadingSpinner';
 interface MagicCreationProps {
   brideImage: string | null;
   groomImage: string | null;
+  coupleImage?: string | null;
   onClose: () => void;
 }
 
-const MagicCreation: React.FC<MagicCreationProps> = ({ brideImage, groomImage, onClose }) => {
+const MagicCreation: React.FC<MagicCreationProps> = ({ brideImage, groomImage, coupleImage, onClose }) => {
   const [config, setConfig] = useState<GenerationConfig>({
     location: LOCATIONS[1].promptValue,
     brideAttire: '',
@@ -28,14 +29,30 @@ const MagicCreation: React.FC<MagicCreationProps> = ({ brideImage, groomImage, o
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedCoupleImage, setUploadedCoupleImage] = useState<string | null>(coupleImage || null);
 
   const handleConfigChange = useCallback((key: keyof GenerationConfig, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleCoupleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setUploadedCoupleImage(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
   const handleGenerate = async () => {
-    if (!brideImage || !groomImage) {
-      setError("Both bride and groom images are required for Magic Creation.");
+    // Check if we have either individual photos or a couple photo
+    if (uploadedCoupleImage) {
+      // Use couple photo directly - no need for bride/groom individual images
+    } else if (!brideImage || !groomImage) {
+      setError("Please upload either a couple photo or both bride and groom images.");
       return;
     }
 
@@ -53,7 +70,14 @@ const MagicCreation: React.FC<MagicCreationProps> = ({ brideImage, groomImage, o
         jewelry: ''
       };
 
-      const imageUrl = await generatePersonalizedImage(magicConfig, brideImage, groomImage);
+      let imageUrl: string;
+      if (uploadedCoupleImage) {
+        // For couple photos, use them directly as both bride and groom input
+        imageUrl = await generatePersonalizedImage(magicConfig, uploadedCoupleImage, uploadedCoupleImage);
+      } else {
+        imageUrl = await generatePersonalizedImage(magicConfig, brideImage, groomImage);
+      }
+      
       setGeneratedImage(imageUrl);
     } catch (err) {
       if (err instanceof Error) {
@@ -111,20 +135,99 @@ const MagicCreation: React.FC<MagicCreationProps> = ({ brideImage, groomImage, o
               </button>
             </div>
 
-            {/* Preview Images */}
-            <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-stone-100 rounded-lg">
-              <div className="text-center">
-                <h4 className="font-semibold mb-2 text-stone-700">Styled Bride</h4>
-                {brideImage && (
-                  <img src={brideImage} alt="Styled Bride" className="rounded-lg shadow-sm w-full object-cover h-24" />
-                )}
+            {/* Upload Option Toggle */}
+            <div className="mb-6 p-4 bg-stone-100 rounded-lg">
+              <div className="mb-4">
+                <h4 className="font-semibold text-stone-700 mb-3">Upload Options</h4>
+                <div className="flex gap-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="uploadType"
+                      checked={!uploadedCoupleImage}
+                      onChange={() => setUploadedCoupleImage(null)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Use Individual Photos</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="uploadType"
+                      checked={!!uploadedCoupleImage}
+                      onChange={() => {}}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Upload Couple Photo</span>
+                  </label>
+                </div>
               </div>
-              <div className="text-center">
-                <h4 className="font-semibold mb-2 text-stone-700">Styled Groom</h4>
-                {groomImage && (
-                  <img src={groomImage} alt="Styled Groom" className="rounded-lg shadow-sm w-full object-cover h-24" />
-                )}
-              </div>
+
+              {uploadedCoupleImage ? (
+                <div className="text-center">
+                  <h4 className="font-semibold mb-2 text-stone-700">Existing Couple Photo</h4>
+                  <img src={uploadedCoupleImage} alt="Couple Photo" className="rounded-lg shadow-sm w-full object-cover h-32 mb-3" />
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoupleImageUpload}
+                      className="hidden"
+                      id="couple-upload"
+                    />
+                    <label
+                      htmlFor="couple-upload"
+                      className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg cursor-pointer hover:bg-purple-700 transition-colors text-center text-sm"
+                    >
+                      Change Photo
+                    </label>
+                    <button
+                      onClick={() => setUploadedCoupleImage(null)}
+                      className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {!brideImage && !groomImage && (
+                    <div className="text-center mb-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoupleImageUpload}
+                        className="hidden"
+                        id="couple-upload-main"
+                      />
+                      <label
+                        htmlFor="couple-upload-main"
+                        className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg cursor-pointer hover:from-purple-700 hover:to-pink-700 transition-colors inline-block"
+                      >
+                        📸 Upload Couple Photo
+                      </label>
+                      <p className="text-xs text-gray-600 mt-2">
+                        Upload an existing couple photo to change scenes and poses only
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <h4 className="font-semibold mb-2 text-stone-700">Styled Bride</h4>
+                      {brideImage && (
+                        <img src={brideImage} alt="Styled Bride" className="rounded-lg shadow-sm w-full object-cover h-24" />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <h4 className="font-semibold mb-2 text-stone-700">Styled Groom</h4>
+                      {groomImage && (
+                        <img src={groomImage} alt="Styled Groom" className="rounded-lg shadow-sm w-full object-cover h-24" />
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Configuration Options */}
@@ -169,7 +272,7 @@ const MagicCreation: React.FC<MagicCreationProps> = ({ brideImage, groomImage, o
             <div className="mt-8">
               <button
                 onClick={handleGenerate}
-                disabled={isLoading || !brideImage || !groomImage}
+                disabled={isLoading || (!uploadedCoupleImage && (!brideImage || !groomImage))}
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg py-4 rounded-lg shadow-md hover:from-purple-700 hover:to-pink-700 transition-all duration-300 disabled:bg-stone-400 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (
